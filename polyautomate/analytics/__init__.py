@@ -35,6 +35,9 @@ Quick start::
 
 from .engine import BacktestEngine
 from .models import BacktestResult, Trade, TradeSignal, Signal
+from .stats import wilson_ci, price_correlation_matrix, min_trades_for_significance
+from .indicators import compute_features, FEATURE_NAMES
+from .strategies.optimal_entry import scan_optimal_entries, EntryProfile, ProfileStrategy
 
 __all__ = [
     "BacktestEngine",
@@ -42,4 +45,12 @@ __all__ = [
     "Trade",
     "TradeSignal",
     "Signal",
+    "wilson_ci",
+    "price_correlation_matrix",
+    "min_trades_for_significance",
+    "compute_features",
+    "FEATURE_NAMES",
+    "scan_optimal_entries",
+    "EntryProfile",
+    "ProfileStrategy",
 ]

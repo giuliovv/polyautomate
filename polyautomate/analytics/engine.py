@@ -7,7 +7,10 @@ then simulates a strategy's performance by replaying bars in order.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Any
 
@@ -16,6 +19,39 @@ from .models import BacktestResult, Signal, Trade, TradeSignal
 from .strategy import BaseStrategy
 
 logger = logging.getLogger(__name__)
+
+
+def _normalise_ts(value: Any) -> str:
+    """
+    Floor a timestamp to the nearest hour so cache keys are stable within
+    a single hour window even when the caller uses datetime.now().
+    """
+    if isinstance(value, (int, float)):
+        # Unix: floor to hour boundary
+        return str(int(value) // 3600 * 3600)
+    s = str(value)
+    # ISO-8601: chop to "YYYY-MM-DDTHH" (drop minutes/seconds/tz)
+    return s[:13]
+
+
+def _cache_key(market_id: str, start_ts: Any, end_ts: Any, resolution: str) -> str:
+    raw = f"{market_id}|{_normalise_ts(start_ts)}|{_normalise_ts(end_ts)}|{resolution}"
+    return hashlib.sha1(raw.encode()).hexdigest()[:16]
+
+
+def _cache_load(cache_dir: str, key: str) -> dict | None:
+    path = os.path.join(cache_dir, f"{key}.json")
+    if os.path.exists(path):
+        with open(path) as f:
+            return json.load(f)
+    return None
+
+
+def _cache_save(cache_dir: str, key: str, data: dict) -> None:
+    os.makedirs(cache_dir, exist_ok=True)
+    path = os.path.join(cache_dir, f"{key}.json")
+    with open(path, "w") as f:
+        json.dump(data, f)
 
 
 def _parse_ts(value: str | int | float) -> int:
@@ -84,9 +120,16 @@ class BacktestEngine:
         Defaults to 48.
     """
 
-    def __init__(self, client: PMDClient, *, history_window: int = 48) -> None:
+    def __init__(
+        self,
+        client: PMDClient,
+        *,
+        history_window: int = 48,
+        cache_dir: str | None = ".cache/backtest",
+    ) -> None:
         self._client = client
         self._history_window = history_window
+        self._cache_dir = cache_dir
 
     # ------------------------------------------------------------------
     # Public API
@@ -145,10 +188,7 @@ class BacktestEngine:
             resolution,
         )
 
-        prices_by_label = self._client.get_prices(
-            market_id, start_ts, end_ts, resolution
-        )
-        books_by_label = self._client.get_books(
+        prices_by_label, books_by_label = self._fetch_data(
             market_id, start_ts, end_ts, resolution
         )
 
@@ -250,6 +290,30 @@ class BacktestEngine:
             result.trades.append(trade)
 
         return result
+
+
+    def _fetch_data(
+        self,
+        market_id: str,
+        start_ts: Any,
+        end_ts: Any,
+        resolution: str,
+    ) -> tuple[dict, dict]:
+        """Return (prices_by_label, books_by_label), reading from disk cache when available."""
+        if self._cache_dir:
+            key = _cache_key(market_id, start_ts, end_ts, resolution)
+            cached = _cache_load(self._cache_dir, key)
+            if cached:
+                logger.info("Cache hit for %s @ %s", market_id, resolution)
+                return cached["prices"], cached["books"]
+
+        prices = self._client.get_prices(market_id, start_ts, end_ts, resolution)
+        books = self._client.get_books(market_id, start_ts, end_ts, resolution)
+
+        if self._cache_dir:
+            _cache_save(self._cache_dir, key, {"prices": prices, "books": books})
+
+        return prices, books
 
 
 # ------------------------------------------------------------------
