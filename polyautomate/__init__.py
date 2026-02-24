@@ -1,30 +1,33 @@
 """
-High-level client helpers for interacting with Polymarket's public data endpoints
-and the central limit order book (CLOB) trading API.
+Polymarket automation toolkit.
 
-The package exposes two main entry points:
+Provides clients for both legacy Polymarket APIs (CLOB trading, Gamma catalog)
+and the new polymarketdata.co high-granularity data API, plus a backtesting
+framework for evaluating trading strategies against historical data.
 
-- :class:`polyautomate.api.data.PolymarketDataClient` for market metadata and
-  historical pricing information.
-- :class:`polyautomate.api.trading.PolymarketTradingClient` for managing private
-  trading actions such as submitting orders.
-
-Typical usage::
+Legacy clients::
 
     from polyautomate.api.trading import PolymarketTradingClient
     from polyautomate.catalog import MarketCatalog
     from polyautomate.history import PriceHistoryService
 
-    trading = PolymarketTradingClient(api_key="...", signing_key="...")
-    trading.place_order(order)
+polymarketdata.co client::
 
-    catalog = MarketCatalog()
-    event = catalog.get_event("event-slug")
-    market = event.markets[0]
-    history = PriceHistoryService().get_price_history(
-        market_id=market.condition_id,
-        token_id=market.clob_token_ids[0],
-    )
+    from polyautomate.api.polymarketdata import PMDClient
+
+    client = PMDClient(api_key="pk_live_...")
+    prices = client.get_prices("some-market-slug", start_ts="...", end_ts="...", resolution="1h")
+    books  = client.get_books("some-market-slug",  start_ts="...", end_ts="...", resolution="1h")
+
+Backtesting::
+
+    from polyautomate.backtest import BacktestEngine
+    from polyautomate.backtest.strategies.whale_watcher import WhaleWatcherStrategy
+
+    engine   = BacktestEngine(client)
+    strategy = WhaleWatcherStrategy(whale_z_threshold=3.0)
+    result   = engine.run(strategy, "some-market-slug", "YES", start_ts="...", end_ts="...")
+    print(result.summary())
 """
 
 from .exceptions import PolymarketAPIError
@@ -32,11 +35,14 @@ from .catalog import MarketCatalog, CatalogEvent, CatalogMarket
 from .market import MarketToken, parse_market_tokens, resolve_market_id, resolve_token_id
 from .api.data import PolymarketDataClient
 from .api.trading import PolymarketTradingClient
+from .api.polymarketdata import PMDClient, PMDError
 from .models import OrderRequest, OrderResponse, PricePoint
 from .history import PriceHistory, PriceHistoryService
 from .archive import MarketHistoryExporter, ExportResult, ExportSummary
+from .backtest import BacktestEngine, BacktestResult, Trade, TradeSignal, Signal
 
 __all__ = [
+    # Legacy Polymarket API clients
     "PolymarketDataClient",
     "PolymarketTradingClient",
     "PolymarketAPIError",
@@ -55,4 +61,13 @@ __all__ = [
     "MarketHistoryExporter",
     "ExportResult",
     "ExportSummary",
+    # polymarketdata.co client
+    "PMDClient",
+    "PMDError",
+    # Backtesting framework
+    "BacktestEngine",
+    "BacktestResult",
+    "Trade",
+    "TradeSignal",
+    "Signal",
 ]
