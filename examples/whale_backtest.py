@@ -112,7 +112,7 @@ def main() -> None:
     # ---- Time range defaults: last 90 days ----
     now = datetime.now(timezone.utc)
     end_ts = args.end or now.isoformat()
-    start_ts = args.start or (now - timedelta(days=90)).isoformat()
+    start_ts = args.start or (now - timedelta(days=29)).isoformat()
 
     print(f"\nMarket  : {market_id}")
     print(f"Token   : {args.token}")
