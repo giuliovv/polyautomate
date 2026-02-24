@@ -21,8 +21,21 @@ from .strategy import BaseStrategy
 logger = logging.getLogger(__name__)
 
 
+def _normalise_ts(value: Any) -> str:
+    """
+    Floor a timestamp to the nearest hour so cache keys are stable within
+    a single hour window even when the caller uses datetime.now().
+    """
+    if isinstance(value, (int, float)):
+        # Unix: floor to hour boundary
+        return str(int(value) // 3600 * 3600)
+    s = str(value)
+    # ISO-8601: chop to "YYYY-MM-DDTHH" (drop minutes/seconds/tz)
+    return s[:13]
+
+
 def _cache_key(market_id: str, start_ts: Any, end_ts: Any, resolution: str) -> str:
-    raw = f"{market_id}|{start_ts}|{end_ts}|{resolution}"
+    raw = f"{market_id}|{_normalise_ts(start_ts)}|{_normalise_ts(end_ts)}|{resolution}"
     return hashlib.sha1(raw.encode()).hexdigest()[:16]
 
 

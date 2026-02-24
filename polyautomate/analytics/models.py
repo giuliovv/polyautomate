@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from .stats import ConfidenceInterval, wilson_ci
+
 
 class Signal(str, Enum):
     """Direction of a trade signal."""
@@ -86,6 +88,12 @@ class BacktestResult:
         return wins / len(self.trades)
 
     @property
+    def win_rate_ci(self) -> ConfidenceInterval:
+        """Wilson 95 % confidence interval for the win rate."""
+        wins = sum(1 for t in self.trades if t.pnl > 0)
+        return wilson_ci(wins, self.n_trades)
+
+    @property
     def total_pnl(self) -> float:
         return sum(t.pnl for t in self.trades)
 
@@ -136,7 +144,7 @@ class BacktestResult:
             f"=== Backtest: {self.strategy_name} on {self.market_id} ({self.token_label}) ===",
             f"Resolution  : {self.resolution}",
             f"Trades      : {self.n_trades}",
-            f"Win rate    : {self.win_rate:.1%}",
+            f"Win rate    : {self.win_rate:.1%}  95% CI {self.win_rate_ci}",
             f"Total P&L   : {self.total_pnl:+.4f} probability pts",
             f"Avg P&L     : {self.avg_pnl:+.4f}",
             f"Max drawdown: {self.max_drawdown:.4f}",
