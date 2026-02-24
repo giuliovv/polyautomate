@@ -1,4 +1,4 @@
-"""Internal modules for Polymarket API clients."""
+"""Polymarket API client modules (data fetching and order execution)."""
 
 from .data import PolymarketDataClient
 from .trading import PolymarketTradingClient

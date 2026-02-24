@@ -1,61 +1,66 @@
 """
-Polymarket automation toolkit.
+Polymarket analytics toolkit.
 
-Provides clients for both legacy Polymarket APIs (CLOB trading, Gamma catalog)
-and the new polymarketdata.co high-granularity data API, plus a backtesting
-framework for evaluating trading strategies against historical data.
+Provides an analytics and strategy-simulation framework backed by
+polymarketdata.co data, with thin client wrappers for the Polymarket APIs.
 
-Legacy clients::
+Analytics / backtesting::
 
-    from polyautomate.api.trading import PolymarketTradingClient
-    from polyautomate.catalog import MarketCatalog
-    from polyautomate.history import PriceHistoryService
+    from polyautomate.clients.polymarketdata import PMDClient
+    from polyautomate.analytics import BacktestEngine
+    from polyautomate.analytics.strategies.whale_watcher import WhaleWatcherStrategy
 
-polymarketdata.co client::
-
-    from polyautomate.api.polymarketdata import PMDClient
-
-    client = PMDClient(api_key="pk_live_...")
-    prices = client.get_prices("some-market-slug", start_ts="...", end_ts="...", resolution="1h")
-    books  = client.get_books("some-market-slug",  start_ts="...", end_ts="...", resolution="1h")
-
-Backtesting::
-
-    from polyautomate.backtest import BacktestEngine
-    from polyautomate.backtest.strategies.whale_watcher import WhaleWatcherStrategy
-
+    client   = PMDClient(api_key="pk_live_...")
     engine   = BacktestEngine(client)
     strategy = WhaleWatcherStrategy(whale_z_threshold=3.0)
     result   = engine.run(strategy, "some-market-slug", "YES", start_ts="...", end_ts="...")
     print(result.summary())
+
+Data collection::
+
+    from polyautomate.data import MarketCatalog, PriceHistoryService
+
+Market clients::
+
+    from polyautomate.clients.trading import PolymarketTradingClient
+    from polyautomate.models import OrderRequest
 """
 
 from .exceptions import PolymarketAPIError
-from .catalog import MarketCatalog, CatalogEvent, CatalogMarket
-from .market import MarketToken, parse_market_tokens, resolve_market_id, resolve_token_id
-from .api.data import PolymarketDataClient
-from .api.trading import PolymarketTradingClient
-from .api.polymarketdata import PMDClient, PMDError
 from .models import OrderRequest, OrderResponse, PricePoint
-from .history import PriceHistory, PriceHistoryService
-from .archive import MarketHistoryExporter, ExportResult, ExportSummary
-from .backtest import BacktestEngine, BacktestResult, Trade, TradeSignal, Signal
+from .data import (
+    MarketCatalog,
+    CatalogEvent,
+    CatalogMarket,
+    MarketToken,
+    parse_market_tokens,
+    resolve_market_id,
+    resolve_token_id,
+    PriceHistory,
+    PriceHistoryService,
+    MarketHistoryExporter,
+    ExportResult,
+    ExportSummary,
+)
+from .clients import PolymarketDataClient, PolymarketTradingClient
+from .clients.polymarketdata import PMDClient, PMDError
+from .analytics import BacktestEngine, BacktestResult, Trade, TradeSignal, Signal
 
 __all__ = [
-    # Legacy Polymarket API clients
-    "PolymarketDataClient",
-    "PolymarketTradingClient",
-    "PolymarketAPIError",
-    "OrderRequest",
-    "OrderResponse",
+    # Analytics framework
+    "BacktestEngine",
+    "BacktestResult",
+    "Trade",
+    "TradeSignal",
+    "Signal",
+    # Data utilities
+    "MarketCatalog",
+    "CatalogEvent",
+    "CatalogMarket",
     "MarketToken",
     "parse_market_tokens",
     "resolve_market_id",
     "resolve_token_id",
-    "MarketCatalog",
-    "CatalogEvent",
-    "CatalogMarket",
-    "PricePoint",
     "PriceHistory",
     "PriceHistoryService",
     "MarketHistoryExporter",
@@ -64,10 +69,11 @@ __all__ = [
     # polymarketdata.co client
     "PMDClient",
     "PMDError",
-    # Backtesting framework
-    "BacktestEngine",
-    "BacktestResult",
-    "Trade",
-    "TradeSignal",
-    "Signal",
+    # Legacy Polymarket API clients
+    "PolymarketDataClient",
+    "PolymarketTradingClient",
+    "PolymarketAPIError",
+    "OrderRequest",
+    "OrderResponse",
+    "PricePoint",
 ]

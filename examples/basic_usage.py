@@ -2,10 +2,10 @@
 
 from datetime import datetime, timedelta, timezone
 
-from polyautomate.api.trading import PolymarketTradingClient
-from polyautomate.archive import MarketHistoryExporter
-from polyautomate.catalog import MarketCatalog
-from polyautomate.history import PriceHistoryService
+from polyautomate.clients.trading import PolymarketTradingClient
+from polyautomate.data.archive import MarketHistoryExporter
+from polyautomate.data.catalog import MarketCatalog
+from polyautomate.data.history import PriceHistoryService
 from polyautomate.models import OrderRequest
 
 
