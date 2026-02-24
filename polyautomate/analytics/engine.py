@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from ..api.polymarketdata import PMDClient
+from ..clients.polymarketdata import PMDClient
 from .models import BacktestResult, Signal, Trade, TradeSignal
 from .strategy import BaseStrategy
 

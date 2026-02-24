@@ -7,8 +7,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, List, Sequence
 
-from .api.data import PolymarketDataClient
-from .models import PricePoint
+from ..clients.data import PolymarketDataClient
+from ..models import PricePoint
 
 
 @dataclass(slots=True)
