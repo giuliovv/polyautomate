@@ -8,6 +8,7 @@ then simulates a strategy's performance by replaying bars in order.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from ..api.polymarketdata import PMDClient
@@ -15,6 +16,58 @@ from .models import BacktestResult, Signal, Trade, TradeSignal
 from .strategy import BaseStrategy
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_ts(value: str | int | float) -> int:
+    """
+    Convert a polymarketdata.co timestamp to a Unix int.
+
+    The prices endpoint returns ISO-8601 strings in the ``t`` field;
+    the books endpoint may return integers.  Both are normalised here.
+    """
+    if isinstance(value, (int, float)):
+        return int(value)
+    # ISO-8601 string e.g. "2024-10-01T06:00:00" or "2024-10-01T06:00:00+00:00"
+    try:
+        dt = datetime.fromisoformat(value)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp())
+    except ValueError:
+        return 0
+
+
+def _extract_price_series(raw: list[dict]) -> list[dict]:
+    """
+    Normalise a raw price list to ``[{ts: int, price: float}, ...]``.
+
+    The API returns ``{t: ISO-str, p: float}`` but future API versions or
+    the books endpoint may use ``{ts: int, price: float}``.
+    """
+    out = []
+    for pt in raw:
+        ts = _parse_ts(pt.get("t") or pt.get("ts", 0))
+        price = float(pt.get("p") or pt.get("price", 0))
+        out.append({"ts": ts, "price": price})
+    return out
+
+
+def _extract_book_series(raw: list[dict]) -> list[dict]:
+    """
+    Normalise a raw book snapshot list.
+
+    The API uses ``{ts: int, bids: [[p,s],...], asks: [[p,s],...]}``
+    (or ``t`` for the timestamp, mirroring the prices format).
+    """
+    out = []
+    for snap in raw:
+        ts = _parse_ts(snap.get("t") or snap.get("ts", 0))
+        out.append({
+            "ts": ts,
+            "bids": snap.get("bids", []),
+            "asks": snap.get("asks", []),
+        })
+    return out
 
 
 class BacktestEngine:
@@ -99,17 +152,18 @@ class BacktestEngine:
             market_id, start_ts, end_ts, resolution
         )
 
-        price_series = prices_by_label.get(token_label, [])
-        book_series = books_by_label.get(token_label, [])
+        raw_prices = prices_by_label.get(token_label, [])
+        raw_books = books_by_label.get(token_label, [])
 
-        if not price_series:
+        if not raw_prices:
             raise ValueError(
                 f"No price data for token label '{token_label}' in market '{market_id}'. "
                 f"Available labels: {list(prices_by_label.keys())}"
             )
 
-        # Align by timestamp
-        price_series = sorted(price_series, key=lambda x: x["ts"])
+        # Normalise and align by timestamp
+        price_series = sorted(_extract_price_series(raw_prices), key=lambda x: x["ts"])
+        book_series = _extract_book_series(raw_books)
         book_by_ts = {snap["ts"]: snap for snap in book_series}
 
         result = BacktestResult(
@@ -182,7 +236,7 @@ class BacktestEngine:
             if open_trade is not None:
                 open_trade.bars_held += 1
 
-        # Close any position still open at end of data
+        # Close any position still open at end of data (price_series already normalised)
         if open_trade is not None and price_series:
             last_price = price_series[-1]["price"]
             last_ts = price_series[-1]["ts"]

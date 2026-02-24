@@ -114,13 +114,30 @@ class PMDClient:
         raise PMDError(429, "Rate limit retry exhausted")
 
     def _paginate(
-        self, path: str, params: dict[str, Any] | None = None
+        self,
+        path: str,
+        params: dict[str, Any] | None = None,
+        *,
+        max_items: int | None = None,
     ) -> Iterator[dict]:
-        """Yields all items from a cursor-paginated list endpoint."""
+        """
+        Yield items from a cursor-paginated list endpoint.
+
+        Parameters
+        ----------
+        max_items:
+            Stop after yielding this many items total.  ``None`` means
+            fetch all pages until the server returns no next_cursor.
+        """
         params = dict(params or {})
+        yielded = 0
         while True:
             resp = self._get(path, params)
-            yield from resp.get("data", [])
+            for item in resp.get("data", []):
+                yield item
+                yielded += 1
+                if max_items is not None and yielded >= max_items:
+                    return
             cursor = resp.get("metadata", {}).get("next_cursor")
             if not cursor:
                 break
@@ -151,6 +168,9 @@ class PMDClient:
         """Return all available market tags."""
         return self._get("/v1/tags").get("data", [])
 
+    # Default page size used for list endpoints (separate from the user-facing limit).
+    _PAGE_SIZE = 100
+
     def list_markets(
         self,
         *,
@@ -176,12 +196,14 @@ class PMDClient:
             ``"any"`` (default) returns markets matching at least one tag;
             ``"all"`` requires all tags to match.
         limit:
-            Page size (1–1000, default 100). Pagination is handled automatically.
+            Maximum total number of markets to yield.  Pagination is handled
+            automatically; pass a large number (or ``None`` not yet supported)
+            to retrieve all matching markets.
         """
         params: dict[str, Any] = {
             "sort": sort,
             "order": order,
-            "limit": min(limit, 1000),
+            "limit": min(limit, self._PAGE_SIZE),  # per-page; API max is 1000
         }
         if search is not None:
             params["search"] = search
@@ -192,7 +214,7 @@ class PMDClient:
             params["start_date_min"] = start_date_min
         if end_date_max is not None:
             params["end_date_max"] = end_date_max
-        yield from self._paginate("/v1/markets", params)
+        yield from self._paginate("/v1/markets", params, max_items=limit)
 
     def list_events(
         self,
@@ -202,12 +224,12 @@ class PMDClient:
         limit: int = 100,
     ) -> Iterator[dict]:
         """Iterate over events (groups of related markets)."""
-        params: dict[str, Any] = {"limit": min(limit, 1000)}
+        params: dict[str, Any] = {"limit": min(limit, self._PAGE_SIZE)}
         if search is not None:
             params["search"] = search
         if tags is not None:
             params["tags"] = tags
-        yield from self._paginate("/v1/events", params)
+        yield from self._paginate("/v1/events", params, max_items=limit)
 
     def list_series(
         self,
@@ -217,12 +239,12 @@ class PMDClient:
         limit: int = 100,
     ) -> Iterator[dict]:
         """Iterate over series (recurring event collections)."""
-        params: dict[str, Any] = {"limit": min(limit, 1000)}
+        params: dict[str, Any] = {"limit": min(limit, self._PAGE_SIZE)}
         if search is not None:
             params["search"] = search
         if tags is not None:
             params["tags"] = tags
-        yield from self._paginate("/v1/series", params)
+        yield from self._paginate("/v1/series", params, max_items=limit)
 
     def get_market(self, id_or_slug: str) -> dict:
         """
