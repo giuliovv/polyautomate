@@ -38,6 +38,8 @@ from .models import BacktestResult, Trade, TradeSignal, Signal
 from .stats import wilson_ci, price_correlation_matrix, min_trades_for_significance
 from .indicators import compute_features, FEATURE_NAMES
 from .strategies.optimal_entry import scan_optimal_entries, EntryProfile, ProfileStrategy
+from .strategies.rsi_mean_reversion import RSIMeanReversionStrategy
+from .strategies.macd_momentum import MACDMomentumStrategy
 
 __all__ = [
     "BacktestEngine",
@@ -53,4 +55,6 @@ __all__ = [
     "scan_optimal_entries",
     "EntryProfile",
     "ProfileStrategy",
+    "RSIMeanReversionStrategy",
+    "MACDMomentumStrategy",
 ]
