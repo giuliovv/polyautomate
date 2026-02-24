@@ -23,15 +23,16 @@ logger = logging.getLogger(__name__)
 
 def _normalise_ts(value: Any) -> str:
     """
-    Floor a timestamp to the nearest hour so cache keys are stable within
-    a single hour window even when the caller uses datetime.now().
+    Floor a timestamp to the nearest minute so cache keys are stable even
+    when the caller uses datetime.now(), while still being correct for
+    sub-hourly resolutions like "1m" and "10m".
     """
     if isinstance(value, (int, float)):
-        # Unix: floor to hour boundary
-        return str(int(value) // 3600 * 3600)
+        # Unix: floor to minute boundary
+        return str(int(value) // 60 * 60)
     s = str(value)
-    # ISO-8601: chop to "YYYY-MM-DDTHH" (drop minutes/seconds/tz)
-    return s[:13]
+    # ISO-8601: chop to "YYYY-MM-DDTHH:MM" (drop seconds/tz)
+    return s[:16]
 
 
 def _cache_key(market_id: str, start_ts: Any, end_ts: Any, resolution: str) -> str:
