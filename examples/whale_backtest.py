@@ -37,9 +37,9 @@ from datetime import datetime, timedelta, timezone
 # Allow running from repo root without installing the package
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from polyautomate.api.polymarketdata import PMDClient, PMDError
-from polyautomate.backtest import BacktestEngine
-from polyautomate.backtest.strategies.whale_watcher import WhaleWatcherStrategy
+from polyautomate.clients.polymarketdata import PMDClient, PMDError
+from polyautomate.analytics import BacktestEngine
+from polyautomate.analytics.strategies.whale_watcher import WhaleWatcherStrategy
 
 
 def parse_args() -> argparse.Namespace:

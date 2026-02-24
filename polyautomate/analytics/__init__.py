@@ -6,9 +6,9 @@ to simulate strategy performance on resolved markets.
 
 Quick start::
 
-    from polyautomate.api.polymarketdata import PMDClient
-    from polyautomate.backtest import BacktestEngine
-    from polyautomate.backtest.strategies.whale_watcher import WhaleWatcherStrategy
+    from polyautomate.clients.polymarketdata import PMDClient
+    from polyautomate.analytics import BacktestEngine
+    from polyautomate.analytics.strategies.whale_watcher import WhaleWatcherStrategy
 
     client = PMDClient(api_key="pk_live_...")
     engine = BacktestEngine(client)

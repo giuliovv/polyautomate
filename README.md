@@ -1,13 +1,18 @@
 # Polyautomate
 
-Utility clients for building Polymarket trading automations.
+Utility clients for building Polymarket trading automations, with a built-in
+backtesting framework for evaluating strategies against historical data.
 
-## Features
+## Package layout
 
-- Fetch active markets and market metadata from the CLOB API.
-- Pull price history for specific tickets/outcomes to seed simulations.
-- Submit, cancel, and list orders with authenticated requests.
-- Minimal data models for order creation and acknowledgement handling.
+```
+polyautomate/
+├── analytics/      ← backtesting engine & strategies (primary)
+├── data/           ← market discovery, price history, CSV export
+├── clients/        ← API wrappers (CLOB, Gamma, polymarketdata.co)
+├── models.py       ← shared order/price models
+└── exceptions.py
+```
 
 ## Installation
 
@@ -17,11 +22,40 @@ pip install -e .
 
 Requires Python 3.10+.
 
-## Quick start
+## Quick start — backtesting
 
 ```python
-from polyautomate.api.data import PolymarketDataClient
-from polyautomate.api.trading import PolymarketTradingClient
+from polyautomate.clients.polymarketdata import PMDClient
+from polyautomate.analytics import BacktestEngine
+from polyautomate.analytics.strategies.whale_watcher import WhaleWatcherStrategy
+
+client = PMDClient(api_key="pk_live_...")
+engine = BacktestEngine(client)
+
+strategy = WhaleWatcherStrategy(
+    whale_z_threshold=3.0,
+    trend_lookback=24,
+    hold_periods=12,
+    stop_loss=0.05,
+    take_profit=0.10,
+)
+
+result = engine.run(
+    strategy=strategy,
+    market_id="some-market-slug",
+    token_label="YES",
+    start_ts="2024-01-01T00:00:00Z",
+    end_ts="2024-06-01T00:00:00Z",
+    resolution="1h",
+)
+print(result.summary())
+```
+
+## Quick start — data clients
+
+```python
+from polyautomate.clients.data import PolymarketDataClient
+from polyautomate.clients.trading import PolymarketTradingClient
 from polyautomate.models import OrderRequest
 
 data = PolymarketDataClient()  # price history & trade lookups
@@ -47,9 +81,9 @@ print(ack.order_id, ack.status)
 ### Historical prices
 
 ```python
-from polyautomate.api.data import PolymarketDataClient
-from polyautomate.catalog import MarketCatalog
-from polyautomate.history import PriceHistoryService
+from polyautomate.clients.data import PolymarketDataClient
+from polyautomate.data.catalog import MarketCatalog
+from polyautomate.data.history import PriceHistoryService
 
 data = PolymarketDataClient()
 catalog = MarketCatalog()
@@ -71,7 +105,7 @@ print(frame.head())
 ### Exporting a local history archive
 
 ```python
-from polyautomate.archive import MarketHistoryExporter
+from polyautomate.data.archive import MarketHistoryExporter
 
 exporter = MarketHistoryExporter(output_dir="history")
 summary = exporter.export_search(query="shutdown", closed=False, interval="1m")
@@ -87,7 +121,7 @@ Each CSV is indexed by timestamp and ready for downstream analysis.
 
 The trading client signs every request using the standard Polymarket CLOB flow:
 
-# Before you can trade programmatically
+### Before you can trade programmatically
 
 1. Log in at [polymarket.com](https://polymarket.com) with your wallet (e.g. MetaMask).
 2. Navigate to **Settings → API** and follow the prompts to enable API access. Polymarket

@@ -11,7 +11,7 @@ import json
 
 import requests
 
-from .exceptions import PolymarketAPIError
+from ..exceptions import PolymarketAPIError
 
 CATALOG_BASE_URL = "https://gamma-api.polymarket.com"
 
