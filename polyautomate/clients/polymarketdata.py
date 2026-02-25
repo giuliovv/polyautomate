@@ -178,6 +178,7 @@ class PMDClient:
         tags: list[str] | None = None,
         tags_match: str = "any",
         start_date_min: str | None = None,
+        end_date_min: str | None = None,
         end_date_max: str | None = None,
         sort: str = "updated_at",
         order: str = "desc",
@@ -195,6 +196,11 @@ class PMDClient:
         tags_match:
             ``"any"`` (default) returns markets matching at least one tag;
             ``"all"`` requires all tags to match.
+        end_date_min:
+            Only return markets whose scheduled end date is on or after this
+            timestamp (ISO-8601).  Useful for finding markets that have not yet
+            reached their scheduled close (note: some markets may still have
+            ``status=closed`` if they resolved early).
         limit:
             Maximum total number of markets to yield.  Pagination is handled
             automatically; pass a large number (or ``None`` not yet supported)
@@ -212,6 +218,8 @@ class PMDClient:
             params["tags_match"] = tags_match
         if start_date_min is not None:
             params["start_date_min"] = start_date_min
+        if end_date_min is not None:
+            params["end_date_min"] = end_date_min
         if end_date_max is not None:
             params["end_date_max"] = end_date_max
         yield from self._paginate("/v1/markets", params, max_items=limit)

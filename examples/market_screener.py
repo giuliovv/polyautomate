@@ -215,16 +215,23 @@ def screen_markets(
     if verbose:
         print(f"Fetching up to {candidates} active markets…")
 
-    market_list = list(client.list_markets(
-        search=search,
-        tags=tags,
-        sort="volume",
-        order="desc",
-        limit=candidates,
-    ))
+    # end_date_min=now: only return markets whose scheduled end is in the future
+    # (avoids filling the list with recently-closed short-duration markets).
+    # We still filter out early-resolved markets below via status check.
+    market_list = [
+        m for m in client.list_markets(
+            search=search,
+            tags=tags,
+            sort="updated_at",
+            order="desc",
+            end_date_min=now.isoformat(),
+            limit=candidates * 3,   # overfetch; many will be filtered
+        )
+        if m.get("status") not in ("closed", "resolved")
+    ][:candidates]
 
     if verbose:
-        print(f"Scoring {len(market_list)} markets (look-back: {lookback_days}d @ 6h)…\n")
+        print(f"Scoring {len(market_list)} open markets (look-back: {lookback_days}d @ 6h)…\n")
 
     results: list[MarketScore] = []
 
