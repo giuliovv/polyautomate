@@ -39,13 +39,26 @@ Optional filters
 * ``min_price`` / ``max_price``: Ignore bars where the token price is
   outside this range.  Useful to skip near-resolution extreme prices
   (e.g. > 0.95 or < 0.05) where reversion assumptions break down.
+
+* ``trend_filter``: When True, suppress signals that trade *against* a
+  strong prevailing trend.  Specifically:
+
+  - If the market has risen by more than ``trend_threshold`` probability
+    points over the last ``trend_lookback`` bars, SELL signals are blocked
+    (do not short into an uptrend).
+  - If it has fallen by more than ``trend_threshold`` pp, BUY signals are
+    blocked (do not buy into a downtrend).
+
+  This prevents the strategy from being stopped out on news-driven moves
+  where RSI goes overbought/oversold *because* of a genuine trend, not a
+  transient deviation.  Default False.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from ..indicators import bollinger, book_pressure, rsi
+from ..indicators import bollinger, book_pressure, rsi, trend_slope
 from ..models import Signal, TradeSignal
 from ..strategy import BaseStrategy
 
@@ -80,6 +93,15 @@ class RSIMeanReversionStrategy(BaseStrategy):
         Skip bars where price < min_price (near-zero prices).  Default 0.03.
     max_price:
         Skip bars where price > max_price (near-resolution prices).  Default 0.97.
+    trend_filter:
+        If True, block signals that trade against a strong prevailing trend.
+        Default False.
+    trend_lookback:
+        Number of bars over which to measure the trend.  Default 24 (one day
+        at 1-hour resolution).
+    trend_threshold:
+        Minimum net price change (probability points) over ``trend_lookback``
+        bars to consider the trend "strong".  Default 0.05 (5 pp).
     """
 
     def __init__(
@@ -95,6 +117,9 @@ class RSIMeanReversionStrategy(BaseStrategy):
         book_depth: int = 5,
         min_price: float = 0.03,
         max_price: float = 0.97,
+        trend_filter: bool = False,
+        trend_lookback: int = 24,
+        trend_threshold: float = 0.05,
     ) -> None:
         self.rsi_period = rsi_period
         self.oversold_threshold = oversold_threshold
@@ -106,6 +131,9 @@ class RSIMeanReversionStrategy(BaseStrategy):
         self.book_depth = book_depth
         self.min_price = min_price
         self.max_price = max_price
+        self.trend_filter = trend_filter
+        self.trend_lookback = trend_lookback
+        self.trend_threshold = trend_threshold
 
     # ------------------------------------------------------------------
     # BaseStrategy interface
@@ -128,6 +156,9 @@ class RSIMeanReversionStrategy(BaseStrategy):
             "book_depth": self.book_depth,
             "min_price": self.min_price,
             "max_price": self.max_price,
+            "trend_filter": self.trend_filter,
+            "trend_lookback": self.trend_lookback,
+            "trend_threshold": self.trend_threshold,
         }
 
     def on_step(
@@ -152,6 +183,19 @@ class RSIMeanReversionStrategy(BaseStrategy):
 
         if not is_oversold and not is_overbought:
             return None
+
+        # ---- Optional trend filter ----
+        # Suppress mean-reversion signals that trade against a strong trend.
+        # RSI goes overbought/oversold both in genuine reversions AND during
+        # news-driven momentum moves; without this filter the strategy takes
+        # heavy stop-losses on the latter.
+        if self.trend_filter:
+            slope = trend_slope(price_history, self.trend_lookback)
+            if slope is not None:
+                if is_overbought and slope >= self.trend_threshold:
+                    return None  # RSI overbought inside an uptrend — skip SELL
+                if is_oversold and slope <= -self.trend_threshold:
+                    return None  # RSI oversold inside a downtrend — skip BUY
 
         # ---- Optional Bollinger Band confirmation ----
         bb_z: float | None = None

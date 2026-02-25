@@ -167,6 +167,24 @@ def main() -> None:
             momentum_confirm=True,
             momentum_period=10,
         ),
+        # RSI + trend filter: skip mean-reversion signals against the trend
+        RSIMeanReversionStrategy(
+            rsi_period=14,
+            oversold_threshold=30.0,
+            overbought_threshold=70.0,
+            trend_filter=True,
+            trend_lookback=24,
+            trend_threshold=0.05,
+        ),
+        # MACD + trend filter: skip crossovers that contradict a strong trend
+        MACDMomentumStrategy(
+            macd_fast=12,
+            macd_slow=26,
+            macd_signal_period=9,
+            trend_filter=True,
+            trend_lookback=24,
+            trend_threshold=0.05,
+        ),
     ]
 
     results: list[BacktestResult] = []
@@ -193,9 +211,11 @@ def main() -> None:
         # Append a short param summary
         p = r.strategy_params
         if r.strategy_name == "RSIMeanReversion":
-            label += f"(rsi={p.get('rsi_period')},bb={p.get('bb_confirm')})"
+            tf = ",tf" if p.get("trend_filter") else ""
+            label += f"(rsi={p.get('rsi_period')},bb={p.get('bb_confirm')}{tf})"
         elif r.strategy_name == "MACDMomentum":
-            label += f"(mom={p.get('momentum_confirm')})"
+            tf = ",tf" if p.get("trend_filter") else ""
+            label += f"(mom={p.get('momentum_confirm')}{tf})"
         print(
             f"  {label:<28}  {r.n_trades:>6}  {r.win_rate:>6.1%}  "
             f"{r.total_pnl:>+9.4f}  {r.avg_pnl:>+8.4f}  {r.sharpe_ratio:>7.3f}"
@@ -246,6 +266,31 @@ def main() -> None:
             )
         except (PMDError, ValueError) as exc:
             print(f"  {fast}/{slow}: ERROR – {exc}")
+
+
+    # ---- Trend threshold sensitivity scan (RSI + trend filter) ----
+    print("\n" + "=" * 78)
+    print("Trend filter sensitivity – varying trend_threshold (RSI, 30/70)")
+    print("=" * 78)
+    print(f"  {'Threshold':>9}  {'Trades':>6}  {'Win%':>6}  {'TotalP&L':>9}  {'Sharpe':>7}")
+    print("  " + "-" * 48)
+    for thr in [0.02, 0.03, 0.05, 0.07, 0.10]:
+        strat = RSIMeanReversionStrategy(
+            rsi_period=14,
+            oversold_threshold=30.0,
+            overbought_threshold=70.0,
+            trend_filter=True,
+            trend_lookback=24,
+            trend_threshold=thr,
+        )
+        try:
+            r = engine.run(strategy=strat, **common)
+            print(
+                f"  {thr:>9.2f}  {r.n_trades:>6}  {r.win_rate:>6.1%}  "
+                f"{r.total_pnl:>+9.4f}  {r.sharpe_ratio:>7.3f}"
+            )
+        except (PMDError, ValueError) as exc:
+            print(f"  {thr}: ERROR – {exc}")
 
 
 if __name__ == "__main__":
