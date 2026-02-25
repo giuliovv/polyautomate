@@ -108,16 +108,22 @@ def _market_tags(mkt: dict) -> list[str]:
     return []
 
 
-def _discover_token(client: PMDClient, slug: str) -> str:
-    """Return 'Yes' or first available label for the market."""
+def _discover_market_info(client: PMDClient, slug: str) -> tuple[str, datetime | None]:
+    """Return (token_label, closed_at) for the market.
+
+    closed_at is the actual resolution timestamp (more accurate than end_date
+    for markets that resolve early, e.g. eSports games or news events).
+    """
     try:
         info = client.get_market(slug)
         tokens = info.get("tokens", [])
         labels = [t.get("outcome") or t.get("label", "") for t in tokens]
-        return next((c for c in ("Yes", "YES") if c in labels),
-                    labels[0] if labels else "Yes")
+        token = next((c for c in ("Yes", "YES") if c in labels),
+                     labels[0] if labels else "Yes")
+        closed_at = _parse_dt(info.get("closed_at"))
+        return token, closed_at
     except PMDError:
-        return "Yes"
+        return "Yes", None
 
 
 def _fetch_resolved_markets(
@@ -210,19 +216,19 @@ def run_scan(
             results.append(sr)
             continue
 
-        # Backtest window: window_days before resolution, stop 2h early
-        bt_end   = end_date - timedelta(hours=2)
-        bt_start = bt_end   - timedelta(days=window_days)
+        token, closed_at = _discover_market_info(client, slug)
 
-        # Guard: window is in the future (shouldn't happen but be safe)
+        # Use the actual close time if available — more accurate than end_date
+        # for markets that resolve early (eSports, news events).
+        resolution_ts = min(t for t in (end_date, closed_at) if t is not None)
+        bt_end   = resolution_ts - timedelta(hours=2)
+        bt_start = bt_end - timedelta(days=window_days)
         if bt_end > now:
             bt_end = now
         if bt_start >= bt_end:
             sr.skipped = "window too short"
             results.append(sr)
             continue
-
-        token = _discover_token(client, slug)
 
         strat = WhaleWatcherStrategy(**STRATEGY_PARAMS)
 
