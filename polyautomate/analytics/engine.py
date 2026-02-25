@@ -11,6 +11,7 @@ import hashlib
 import json
 import logging
 import os
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -292,6 +293,45 @@ class BacktestEngine:
 
         return result
 
+
+    def prefetch_data(
+        self,
+        market_id: str,
+        start_ts: Any,
+        end_ts: Any,
+        resolution: str,
+        *,
+        verbose: bool = True,
+    ) -> bool:
+        """
+        Pre-download and cache price + book data for one market/resolution window.
+
+        Returns True if data was fetched from the API (cache miss), False if
+        already cached.  Prints a progress line when *verbose* is True so long
+        fetches (e.g. 89 days at 1m) are visible.
+        """
+        if not self._cache_dir:
+            raise RuntimeError("prefetch_data requires cache_dir to be set")
+
+        key = _cache_key(market_id, start_ts, end_ts, resolution)
+        if _cache_load(self._cache_dir, key) is not None:
+            if verbose:
+                print(f"  [cache hit]  {market_id} @ {resolution}")
+            return False
+
+        if verbose:
+            print(f"  [fetching]   {market_id} @ {resolution} … ", end="", flush=True)
+        t0 = time.monotonic()
+
+        prices = self._client.get_prices(market_id, start_ts, end_ts, resolution)
+        books  = self._client.get_books(market_id, start_ts, end_ts, resolution)
+
+        _cache_save(self._cache_dir, key, {"prices": prices, "books": books})
+        elapsed = time.monotonic() - t0
+        n_bars = sum(len(v) for v in prices.values())
+        if verbose:
+            print(f"done  ({n_bars:,} bars, {elapsed:.0f}s)")
+        return True
 
     def _fetch_data(
         self,
