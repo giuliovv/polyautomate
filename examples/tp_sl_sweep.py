@@ -8,20 +8,22 @@ a heatmap so you can see which risk parameters actually survive friction.
 
 Fee model
 ---------
-Polymarket charges ~2% per leg (entry + exit).  The round-trip cost on a
-position entered at price *p_in* and exited at *p_out* is:
+Polymarket fees are market-type dependent (docs.polymarket.com/trading/fees):
 
-    cost = fee_rate × (p_in + p_out)
+  - Macro / political / general markets  → NO FEE (default fee_rate = 0.0)
+  - 5/15-min crypto markets              → fee = C × 0.25 × (p×(1-p))² → max ~1.56% at p=0.50
+  - NCAAB / Serie A sports               → fee = C × 0.0175 × (p×(1-p)) → max ~0.44% at p=0.50
 
-This is already built into Trade.pnl when fee_rate > 0.  At 2% per side and
-a typical entry price of 0.50, the round-trip drag is ~2 pp — which wipes out
-a 2pp stop-loss outright.  The sweep makes this visible.
+The engine uses a simplified flat fee_rate per leg (cost = fee_rate × (p_in + p_out))
+since the real formula is price-dependent and requires per-trade share counts.
+For macro markets the correct value is 0.  Use a small positive value (e.g. 0.005)
+to simulate bid-ask spread friction — the real implicit cost even in zero-fee markets.
 
 Grid defaults
 -------------
     stop_loss  : 0.02, 0.03, 0.04, 0.05, 0.06
     take_profit: 0.06, 0.08, 0.10, 0.12, 0.15
-    fee_rate   : 0.02  (fixed, Polymarket taker fee)
+    fee_rate   : 0.0   (macro markets are fee-free; use --fee 0.005 to simulate spread)
 
 Usage
 -----
@@ -36,8 +38,8 @@ Usage
     python examples/tp_sl_sweep.py --api-key pk_live_... \\
         --sl 0.03 0.04 0.05 --tp 0.08 0.10 0.12
 
-    # No fee (compare with/without to see friction impact)
-    python examples/tp_sl_sweep.py --api-key pk_live_... --fee 0.0
+    # Simulate bid-ask spread (e.g. 0.5% per leg even without explicit fees)
+    python examples/tp_sl_sweep.py --api-key pk_live_... --fee 0.005
 
     # Save results to CSV
     python examples/tp_sl_sweep.py --api-key pk_live_... --csv sweep.csv
@@ -63,7 +65,7 @@ from universe_scan import run_scan, ScanResult   # type: ignore[import]
 
 DEFAULT_SL  = [0.02, 0.03, 0.04, 0.05, 0.06]
 DEFAULT_TP  = [0.06, 0.08, 0.10, 0.12, 0.15]
-DEFAULT_FEE = 0.02
+DEFAULT_FEE = 0.0   # macro/political markets have no explicit fee
 
 
 # ── Result aggregation ─────────────────────────────────────────────────────────

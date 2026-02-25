@@ -179,7 +179,16 @@ class BacktestEngine:
             Notional size per trade (used only for dollar P&L reporting).
         fee_rate:
             Fractional fee charged on each leg of the trade (entry + exit).
-            Default 0.0 (no fees). Set to ~0.02 for Polymarket's ~2% taker fee.
+            Default 0.0.
+
+            Polymarket fee reality (see docs.polymarket.com/trading/fees):
+            - Macro / political / general markets: **no fee**
+            - 5/15-min crypto markets: fee = shares × 0.25 × (p×(1-p))² → max ~1.56% at p=0.50
+            - NCAAB / Serie A sports: fee = shares × 0.0175 × (p×(1-p)) → max ~0.44% at p=0.50
+
+            This parameter uses a simplified flat model (fee_rate × notional per leg)
+            because the real formula is price-dependent. For macro markets leave at 0.
+            A non-zero value here primarily models bid-ask spread friction.
 
         Returns
         -------
