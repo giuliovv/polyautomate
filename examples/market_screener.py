@@ -76,6 +76,8 @@ MAX_PRICE        = 0.96     # skip near-certain tokens
 MIN_DAYS_LEFT    = 2        # skip markets resolving very soon
 MIN_BARS         = 10       # skip markets with very little price history
 MAX_SPREAD       = 0.03     # skip markets with avg bid-ask spread > 3 pp
+MAX_REL_SPREAD   = 0.15     # skip if spread / price > 15 % (e.g. 2 pp on a
+                            # 0.12 market = 17 % → structurally untradeable)
 
 
 # ── Data model ─────────────────────────────────────────────────────────────────
@@ -200,6 +202,7 @@ def screen_markets(
     search: str | None = None,
     tags: list[str] | None = None,
     max_spread: float = MAX_SPREAD,
+    max_rel_spread: float = MAX_REL_SPREAD,
     verbose: bool = True,
 ) -> list[MarketScore]:
     """
@@ -301,6 +304,19 @@ def screen_markets(
                       f"(spread={avg_sprd:.3f} > {max_spread:.3f})")
             continue
 
+        # Hard filter: spread too large relative to current price.
+        # A 2.7 pp spread on a 0.15 market = 18 % round-trip cost vs the
+        # Yes price, which makes it structurally impossible to profit even
+        # when the signal is right (e.g. TP=8 pp but spread consumes half).
+        # Use min(p, 1-p) so both the Yes side and No side are checked;
+        # the cheaper token is the one with the worst relative spread.
+        rel_spread = avg_sprd / min(current_price, 1 - current_price)
+        if rel_spread > max_rel_spread:
+            if verbose:
+                print(f"  [{i:>3}] SKIP  {question[:55]}  "
+                      f"(rel_spread={rel_spread:.2%} > {max_rel_spread:.0%})")
+            continue
+
         ms = MarketScore(
             slug=slug,
             question=question,
@@ -358,7 +374,8 @@ def print_table(scores: list[MarketScore], top: int) -> None:
     print()
     print("Columns: Score=composite  Liq/Mov/Time/Pos=sub-scores (0–1)  Spread=avg bid-ask (pp)")
     print(f"Weights: liquidity={W_LIQUIDITY}  movement={W_MOVEMENT}  "
-          f"time={W_TIME}  position={W_POSITION}  |  hard filter: spread≤{MAX_SPREAD:.2f}")
+          f"time={W_TIME}  position={W_POSITION}  |  "
+          f"hard filters: spread≤{MAX_SPREAD:.2f}  rel_spread≤{MAX_REL_SPREAD:.0%}")
 
 
 def print_slugs(scores: list[MarketScore], top: int) -> None:
@@ -386,6 +403,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-spread", type=float, default=MAX_SPREAD,
                    help=f"Hard filter: skip markets with avg bid-ask spread > this "
                         f"(probability pts, default: {MAX_SPREAD})")
+    p.add_argument("--max-rel-spread", type=float, default=MAX_REL_SPREAD,
+                   help=f"Hard filter: skip if spread / price > this fraction "
+                        f"(default: {MAX_REL_SPREAD:.0%})")
     p.add_argument("--slugs-only", action="store_true",
                    help="Print only the top market slugs (one per line) — "
                         "useful for piping into granularity_sweep.py")
@@ -409,6 +429,7 @@ def main() -> None:
         search=args.search,
         tags=args.tags,
         max_spread=args.max_spread,
+        max_rel_spread=args.max_rel_spread,
         verbose=not args.quiet and not args.slugs_only,
     )
 
