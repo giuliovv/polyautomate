@@ -216,12 +216,12 @@ def run_scan(
             results.append(sr)
             continue
 
-        token, closed_at = _discover_market_info(client, slug)
+        token, _ = _discover_market_info(client, slug)
 
-        # Use the actual close time if available — more accurate than end_date
-        # for markets that resolve early (eSports, news events).
-        resolution_ts = min(t for t in (end_date, closed_at) if t is not None)
-        bt_end   = resolution_ts - timedelta(hours=2)
+        # Use end_date (the scheduled close) as the backtest cutoff — this is
+        # the only information available in live trading; closed_at is only
+        # known after the fact and would introduce look-ahead bias.
+        bt_end   = end_date - timedelta(hours=2)
         bt_start = bt_end - timedelta(days=window_days)
         if bt_end > now:
             bt_end = now
