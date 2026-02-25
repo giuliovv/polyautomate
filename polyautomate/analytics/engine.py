@@ -393,15 +393,25 @@ class BacktestEngine:
 
 
 def _best_bid(book: dict) -> float | None:
-    """Return the highest bid price from a book snapshot, or None if empty."""
+    """Return the highest bid price from a book snapshot, or None if empty.
+
+    Uses max() over all levels rather than assuming a fixed sort order, because
+    the polymarketdata API returns bids in ascending price order (worst first)
+    despite the docs suggesting best-first.
+    """
     bids = book.get("bids", [])
-    return float(bids[0][0]) if bids else None
+    return max(float(b[0]) for b in bids) if bids else None
 
 
 def _best_ask(book: dict) -> float | None:
-    """Return the lowest ask price from a book snapshot, or None if empty."""
+    """Return the lowest ask price from a book snapshot, or None if empty.
+
+    Uses min() over all levels rather than assuming a fixed sort order, because
+    the polymarketdata API returns asks in descending price order (worst first)
+    despite the docs suggesting best-first.
+    """
     asks = book.get("asks", [])
-    return float(asks[0][0]) if asks else None
+    return min(float(a[0]) for a in asks) if asks else None
 
 
 def _entry_exec_price(signal: Signal, book: dict, mid: float) -> float:
