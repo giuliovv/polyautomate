@@ -41,17 +41,27 @@ class Trade:
     exit_price: float
     exit_timestamp: int
     exit_reason: str        # "take_profit" | "stop_loss" | "timeout" | "end_of_data"
+    fee_rate: float = 0.0   # Fraction charged on each leg (e.g. 0.02 = 2% per side)
+
+    @property
+    def gross_pnl(self) -> float:
+        """Raw price-move P&L before fees."""
+        raw = self.exit_price - self.entry_price
+        return raw if self.signal.signal == Signal.BUY else -raw
 
     @property
     def pnl(self) -> float:
         """
-        Profit / loss in probability-point terms.
+        Profit / loss in probability-point terms, net of trading fees.
 
-        For a BUY signal: positive when exit_price > entry_price.
-        For a SELL signal: positive when exit_price < entry_price.
+        Polymarket charges a fee on each leg of the trade (entry + exit).
+        Round-trip cost = fee_rate × (entry_price + exit_price).
+
+        For a BUY signal: positive when exit_price > entry_price by more than costs.
+        For a SELL signal: positive when exit_price < entry_price by more than costs.
         """
-        raw = self.exit_price - self.entry_price
-        return raw if self.signal.signal == Signal.BUY else -raw
+        round_trip_cost = self.fee_rate * (self.entry_price + self.exit_price)
+        return self.gross_pnl - round_trip_cost
 
     @property
     def pnl_pct(self) -> float:

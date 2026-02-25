@@ -150,6 +150,7 @@ class BacktestEngine:
         take_profit: float = 0.10,
         hold_periods: int = 24,
         position_size: float = 100.0,
+        fee_rate: float = 0.0,
     ) -> BacktestResult:
         """
         Run a strategy over a historical window and return trade statistics.
@@ -176,6 +177,9 @@ class BacktestEngine:
             Maximum number of bars to hold a position before forcing exit.
         position_size:
             Notional size per trade (used only for dollar P&L reporting).
+        fee_rate:
+            Fractional fee charged on each leg of the trade (entry + exit).
+            Default 0.0 (no fees). Set to ~0.02 for Polymarket's ~2% taker fee.
 
         Returns
         -------
@@ -246,6 +250,7 @@ class BacktestEngine:
                         exit_price=price,
                         exit_timestamp=ts,
                         exit_reason=exit_reason,
+                        fee_rate=fee_rate,
                     )
                     result.trades.append(trade)
                     logger.debug(
@@ -288,6 +293,7 @@ class BacktestEngine:
                 exit_price=last_price,
                 exit_timestamp=last_ts,
                 exit_reason="end_of_data",
+                fee_rate=fee_rate,
             )
             result.trades.append(trade)
 

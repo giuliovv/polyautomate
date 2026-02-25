@@ -170,6 +170,9 @@ def run_scan(
     window_days: int = 30,
     cache_dir: str = ".cache/backtest",
     verbose: bool = True,
+    stop_loss: float = STOP_LOSS,
+    take_profit: float = TAKE_PROFIT,
+    fee_rate: float = 0.0,
 ) -> list[ScanResult]:
     """
     Run WhaleWatcher on every resolved market from the last *resolved_days* days.
@@ -177,6 +180,12 @@ def run_scan(
     For each market, the backtest window is *window_days* before the
     market's end_date (capped at start_date if available), ending 2 hours
     before resolution to avoid trading into the binary resolution spike.
+
+    Parameters
+    ----------
+    stop_loss:   Exit threshold in probability points. Default: STOP_LOSS constant.
+    take_profit: Exit threshold in probability points. Default: TAKE_PROFIT constant.
+    fee_rate:    Round-trip fee per leg (e.g. 0.02 = 2% per side). Default: 0.0.
     """
     now           = datetime.now(timezone.utc)
     resolved_since = now - timedelta(days=resolved_days)
@@ -184,10 +193,11 @@ def run_scan(
     engine = BacktestEngine(client, cache_dir=cache_dir)
 
     if verbose:
+        fee_str = f"  fee={fee_rate:.1%}" if fee_rate else ""
         print(f"Scanning resolved markets: {resolved_since.date()} → {now.date()}")
         print(f"Backtest window per market: {window_days}d @ {RESOLUTION}")
         print(f"Strategy: WhaleWatcher  z={STRATEGY_PARAMS['whale_z_threshold']}  "
-              f"sl={STOP_LOSS}  tp={TAKE_PROFIT}  hold={HOLD_PERIODS}h\n")
+              f"sl={stop_loss}  tp={take_profit}  hold={HOLD_PERIODS}h{fee_str}\n")
 
     markets = list(_fetch_resolved_markets(client, universe_size, resolved_since, now))
 
@@ -240,9 +250,10 @@ def run_scan(
                 start_ts=bt_start.isoformat(),
                 end_ts=bt_end.isoformat(),
                 resolution=RESOLUTION,
-                stop_loss=STOP_LOSS,
-                take_profit=TAKE_PROFIT,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
                 hold_periods=HOLD_PERIODS,
+                fee_rate=fee_rate,
             )
             sr.n_trades    = r.n_trades
             sr.win_rate    = r.win_rate
