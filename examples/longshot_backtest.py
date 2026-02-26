@@ -86,6 +86,7 @@ class LongshotTrade:
     entry_ts:         int    # Unix timestamp
     resolution:       str    # "YES" | "NO"
     resolution_price: float  # final bar mid-price (~0.0 or ~1.0)
+
     pnl_gross:        float  # hold-to-resolution P&L at mid-price (no spread)
     half_spread:      float  # assumed half bid-ask spread subtracted from P&L
     pnl:              float  # net P&L after spread cost (= pnl_gross - half_spread)
