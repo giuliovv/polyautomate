@@ -272,6 +272,12 @@ if [[ "$DESIRED_SIG" != "$CURRENT_SIG" ]]; then
     -e LONGSHOT_MIN_DAYS_LEFT="$LONGSHOT_MIN_DAYS_LEFT" \
     -e LONGSHOT_ORDER_SIZE="$LONGSHOT_ORDER_SIZE" \
     -e LONGSHOT_MAX_ACTIONS_PER_CYCLE="$LONGSHOT_MAX_ACTIONS_PER_CYCLE" \
+    -e LONGSHOT_USE_KELLY="$LONGSHOT_USE_KELLY" \
+    -e LONGSHOT_BANKROLL_USD="$LONGSHOT_BANKROLL_USD" \
+    -e LONGSHOT_KELLY_FRACTION="$LONGSHOT_KELLY_FRACTION" \
+    -e LONGSHOT_MAX_BANKROLL_FRACTION="$LONGSHOT_MAX_BANKROLL_FRACTION" \
+    -e LONGSHOT_MIN_NOTIONAL_USD="$LONGSHOT_MIN_NOTIONAL_USD" \
+    -e LONGSHOT_MAX_NOTIONAL_USD="$LONGSHOT_MAX_NOTIONAL_USD" \
     --log-driver=awslogs \
     --log-opt awslogs-region="$REGION" \
     --log-opt awslogs-group="$LOG_GROUP" \
@@ -293,6 +299,12 @@ SCRIPT""",
             "echo 'LONGSHOT_MIN_DAYS_LEFT=2' >> /etc/polyautomate-executor.env",
             "echo 'LONGSHOT_ORDER_SIZE=5' >> /etc/polyautomate-executor.env",
             "echo 'LONGSHOT_MAX_ACTIONS_PER_CYCLE=1' >> /etc/polyautomate-executor.env",
+            "echo 'LONGSHOT_USE_KELLY=1' >> /etc/polyautomate-executor.env",
+            "echo 'LONGSHOT_BANKROLL_USD=500' >> /etc/polyautomate-executor.env",
+            "echo 'LONGSHOT_KELLY_FRACTION=0.25' >> /etc/polyautomate-executor.env",
+            "echo 'LONGSHOT_MAX_BANKROLL_FRACTION=0.03' >> /etc/polyautomate-executor.env",
+            "echo 'LONGSHOT_MIN_NOTIONAL_USD=2' >> /etc/polyautomate-executor.env",
+            "echo 'LONGSHOT_MAX_NOTIONAL_USD=25' >> /etc/polyautomate-executor.env",
             "bash -lc 'set -a; source /etc/polyautomate-executor.env; set +a; /usr/local/bin/reconcile-executor.sh'",
             "echo '*/10 * * * * root bash -lc \"set -a; source /etc/polyautomate-executor.env; set +a; /usr/local/bin/reconcile-executor.sh\"' > /etc/cron.d/polyautomate-reconcile",
             "chmod 644 /etc/cron.d/polyautomate-reconcile",

@@ -46,6 +46,16 @@ class Candidate:
     no_price: float
 
 
+@dataclass
+class SizingDecision:
+    size: float
+    notional_usd: float
+    method: str
+    no_win_prob: float | None = None
+    full_kelly: float | None = None
+    applied_fraction: float | None = None
+
+
 def _is_sports_market(question: str) -> bool:
     q = question.lower()
     return any(kw in q for kw in _SPORTS_KEYWORDS)
@@ -181,6 +191,59 @@ def _scan_candidates(
     return candidates
 
 
+def _estimate_no_win_prob(yes_price: float) -> float:
+    """
+    Heuristic calibrated from LONGSHOT_ANALYSIS.md.
+    Returns estimated probability that NO resolves true.
+    """
+    if yes_price <= 0.10:
+        return 0.995
+    if yes_price <= 0.20:
+        return 0.985
+    if yes_price <= 0.35:
+        return 0.957
+    return 0.917
+
+
+def _compute_order_size(
+    *,
+    yes_price: float,
+    no_price: float,
+    fallback_size: float,
+) -> SizingDecision:
+    use_kelly = os.getenv("LONGSHOT_USE_KELLY", "1") == "1"
+    bankroll_usd = float(os.getenv("LONGSHOT_BANKROLL_USD", "500"))
+    kelly_fraction = float(os.getenv("LONGSHOT_KELLY_FRACTION", "0.25"))
+    max_fraction = float(os.getenv("LONGSHOT_MAX_BANKROLL_FRACTION", "0.03"))
+    min_notional = float(os.getenv("LONGSHOT_MIN_NOTIONAL_USD", "2"))
+    max_notional = float(os.getenv("LONGSHOT_MAX_NOTIONAL_USD", "25"))
+
+    if not use_kelly or bankroll_usd <= 0:
+        return SizingDecision(
+            size=fallback_size,
+            notional_usd=max(0.0, fallback_size * no_price),
+            method="fixed",
+        )
+
+    p = _estimate_no_win_prob(yes_price)
+    q = 1.0 - p
+    b = (1.0 - no_price) / max(no_price, 1e-6)
+    full_kelly = max(0.0, ((b * p) - q) / max(b, 1e-9))
+    applied_fraction = min(max_fraction, full_kelly * kelly_fraction)
+    notional_usd = bankroll_usd * applied_fraction
+    notional_usd = max(min_notional, min(max_notional, notional_usd))
+    size = notional_usd / max(no_price, 1e-6)
+
+    return SizingDecision(
+        size=size,
+        notional_usd=notional_usd,
+        method="kelly",
+        no_win_prob=p,
+        full_kelly=full_kelly,
+        applied_fraction=applied_fraction,
+    )
+
+
 def run_once() -> int:
     pmd_api_key = os.getenv("POLYMARKETDATA_API_KEY", "")
     pm_api_key = os.getenv("POLYMARKET_API_KEY", "")
@@ -202,7 +265,7 @@ def run_once() -> int:
     longshot_threshold = float(os.getenv("LONGSHOT_THRESHOLD", "0.40"))
     min_price = float(os.getenv("LONGSHOT_MIN_PRICE", "0.02"))
     max_price = float(os.getenv("LONGSHOT_MAX_PRICE", "0.96"))
-    order_size = os.getenv("LONGSHOT_ORDER_SIZE", "5")
+    fallback_order_size = float(os.getenv("LONGSHOT_ORDER_SIZE", "5"))
     max_actions = int(os.getenv("LONGSHOT_MAX_ACTIONS_PER_CYCLE", "1"))
 
     pmd = PMDClient(api_key=pmd_api_key)
@@ -240,15 +303,27 @@ def run_once() -> int:
         token_id = c.no_token_id
         price = min(max(c.no_price, 0.01), 0.99)
 
+        sizing = _compute_order_size(
+            yes_price=c.yes_price,
+            no_price=price,
+            fallback_size=fallback_order_size,
+        )
+        order_size = max(round(sizing.size, 4), 0.01)
+
         if dry_run:
             LOGGER.info(
-                "DRY_RUN order slug=%s side=%s token_id=%s price=%.4f size=%s yes_price=%.4f",
+                "DRY_RUN order slug=%s side=%s token_id=%s price=%.4f size=%.4f yes_price=%.4f sizing=%s notional=%.2f p_no=%s full_kelly=%s f=%s",
                 c.slug,
                 side,
                 token_id,
                 price,
                 order_size,
                 c.yes_price,
+                sizing.method,
+                sizing.notional_usd,
+                f"{sizing.no_win_prob:.3f}" if sizing.no_win_prob is not None else "na",
+                f"{sizing.full_kelly:.4f}" if sizing.full_kelly is not None else "na",
+                f"{sizing.applied_fraction:.4f}" if sizing.applied_fraction is not None else "na",
             )
         else:
             expiration = int((now + timedelta(minutes=15)).timestamp())
@@ -256,18 +331,23 @@ def run_once() -> int:
                 token_id=token_id,
                 side=side,
                 price=f"{price:.4f}",
-                size=order_size,
+                size=f"{order_size:.4f}",
                 expiration=expiration,
             )
             ack = trader.place_order(order, post_only=True)  # type: ignore[union-attr]
             LOGGER.info(
-                "order_submitted slug=%s order_id=%s status=%s price=%.4f size=%s yes_price=%.4f",
+                "order_submitted slug=%s order_id=%s status=%s price=%.4f size=%.4f yes_price=%.4f sizing=%s notional=%.2f p_no=%s full_kelly=%s f=%s",
                 c.slug,
                 ack.order_id,
                 ack.status,
                 price,
                 order_size,
                 c.yes_price,
+                sizing.method,
+                sizing.notional_usd,
+                f"{sizing.no_win_prob:.3f}" if sizing.no_win_prob is not None else "na",
+                f"{sizing.full_kelly:.4f}" if sizing.full_kelly is not None else "na",
+                f"{sizing.applied_fraction:.4f}" if sizing.applied_fraction is not None else "na",
             )
 
         traded[c.slug] = {
