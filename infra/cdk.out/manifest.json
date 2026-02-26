@@ -1,0 +1,335 @@
+{
+  "version": "40.0.0",
+  "artifacts": {
+    "PolyautomateStack.assets": {
+      "type": "cdk:asset-manifest",
+      "properties": {
+        "file": "PolyautomateStack.assets.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/polyauto1/version"
+      }
+    },
+    "PolyautomateStack": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://unknown-account/unknown-region",
+      "properties": {
+        "templateFile": "PolyautomateStack.template.json",
+        "terminationProtection": false,
+        "validateOnSynth": false,
+        "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-polyauto1-deploy-role-${AWS::AccountId}-${AWS::Region}",
+        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-polyauto1-cfn-exec-role-${AWS::AccountId}-${AWS::Region}",
+        "stackTemplateAssetObjectUrl": "s3://cdk-polyauto1-assets-${AWS::AccountId}-${AWS::Region}/72ebe9bffac6396111c89c1500ce5adebfd7bf4fcc531a4bf9ebd2f12eb90dc8.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/polyauto1/version",
+        "additionalDependencies": [
+          "PolyautomateStack.assets"
+        ],
+        "lookupRole": {
+          "arn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-polyauto1-lookup-role-${AWS::AccountId}-${AWS::Region}",
+          "requiresBootstrapStackVersion": 8,
+          "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/polyauto1/version"
+        }
+      },
+      "dependencies": [
+        "PolyautomateStack.assets"
+      ],
+      "metadata": {
+        "/PolyautomateStack/PolyautomateVpc/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PolyautomateVpc174EB3C2"
+          }
+        ],
+        "/PolyautomateStack/PolyautomateVpc/publicSubnet1/Subnet": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PolyautomateVpcpublicSubnet1SubnetAB23BF2A"
+          }
+        ],
+        "/PolyautomateStack/PolyautomateVpc/publicSubnet1/RouteTable": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PolyautomateVpcpublicSubnet1RouteTableD4835B2F"
+          }
+        ],
+        "/PolyautomateStack/PolyautomateVpc/publicSubnet1/RouteTableAssociation": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PolyautomateVpcpublicSubnet1RouteTableAssociationB2416930"
+          }
+        ],
+        "/PolyautomateStack/PolyautomateVpc/publicSubnet1/DefaultRoute": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PolyautomateVpcpublicSubnet1DefaultRoute75E17F9A"
+          }
+        ],
+        "/PolyautomateStack/PolyautomateVpc/publicSubnet2/Subnet": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PolyautomateVpcpublicSubnet2Subnet6CE87AE8"
+          }
+        ],
+        "/PolyautomateStack/PolyautomateVpc/publicSubnet2/RouteTable": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PolyautomateVpcpublicSubnet2RouteTable71B75556"
+          }
+        ],
+        "/PolyautomateStack/PolyautomateVpc/publicSubnet2/RouteTableAssociation": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PolyautomateVpcpublicSubnet2RouteTableAssociation0598FAE9"
+          }
+        ],
+        "/PolyautomateStack/PolyautomateVpc/publicSubnet2/DefaultRoute": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PolyautomateVpcpublicSubnet2DefaultRoute0F56F779"
+          }
+        ],
+        "/PolyautomateStack/PolyautomateVpc/IGW": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PolyautomateVpcIGWDA2FBE43"
+          }
+        ],
+        "/PolyautomateStack/PolyautomateVpc/VPCGW": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PolyautomateVpcVPCGW3A2B8357"
+          }
+        ],
+        "/PolyautomateStack/ExecutorRepo/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorRepoC7F7CF24"
+          }
+        ],
+        "/PolyautomateStack/ResearcherRepo/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherRepoC3D9D069"
+          }
+        ],
+        "/PolyautomateStack/ExecutorLogGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorLogGroup0225862E"
+          }
+        ],
+        "/PolyautomateStack/ResearcherLogGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherLogGroupFDAF9609"
+          }
+        ],
+        "/PolyautomateStack/ExecutorCredentialsSecret/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorCredentialsSecretE3494440"
+          }
+        ],
+        "/PolyautomateStack/ResearcherCredentialsSecret/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherCredentialsSecretE874DF3C"
+          }
+        ],
+        "/PolyautomateStack/ExecutorActionMetricFilter/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorActionMetricFilterA3C06F0A"
+          }
+        ],
+        "/PolyautomateStack/ExecutorActionAlarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorActionAlarmECAAD7F7"
+          }
+        ],
+        "/PolyautomateStack/ExecutorSecurityGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorSecurityGroup594EBFE6"
+          }
+        ],
+        "/PolyautomateStack/ExecutorInstanceRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorInstanceRole6182B350"
+          }
+        ],
+        "/PolyautomateStack/ExecutorInstanceRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorInstanceRoleDefaultPolicy7C46CBE8"
+          }
+        ],
+        "/PolyautomateStack/ExecutorHostInstanceV2/InstanceProfile": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorHostInstanceV2InstanceProfileF7FCF868"
+          }
+        ],
+        "/PolyautomateStack/ExecutorHostInstanceV2/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorHostInstanceV23958C3B9"
+          }
+        ],
+        "/PolyautomateStack/ExecutorHostInstanceV2/LaunchTemplate": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorHostInstanceV2LaunchTemplate4F7A5BDC"
+          }
+        ],
+        "/PolyautomateStack/SsmParameterValue:--aws--service--ami-amazon-linux-latest--al2023-ami-kernel-6.1-x86_64:C96584B6-F00A-464E-AD19-53AFF4B05118.Parameter": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "SsmParameterValueawsserviceamiamazonlinuxlatestal2023amikernel61x8664C96584B6F00A464EAD1953AFF4B05118Parameter"
+          }
+        ],
+        "/PolyautomateStack/ResearcherCluster/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherClusterC3B3A763"
+          }
+        ],
+        "/PolyautomateStack/ResearcherTaskRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherTaskRoleF6EA9443"
+          }
+        ],
+        "/PolyautomateStack/ResearcherTaskRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherTaskRoleDefaultPolicy5EAB93AD"
+          }
+        ],
+        "/PolyautomateStack/ResearcherTaskDefinition/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherTaskDefinition48AD3637"
+          }
+        ],
+        "/PolyautomateStack/ResearcherTaskDefinition/ExecutionRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherTaskDefinitionExecutionRole08A0112D"
+          }
+        ],
+        "/PolyautomateStack/ResearcherTaskDefinition/ExecutionRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherTaskDefinitionExecutionRoleDefaultPolicy22E8CB0C"
+          }
+        ],
+        "/PolyautomateStack/ResearcherTaskDefinition/EventsRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherTaskDefinitionEventsRole0D9090F8"
+          }
+        ],
+        "/PolyautomateStack/ResearcherTaskDefinition/EventsRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherTaskDefinitionEventsRoleDefaultPolicy3D2EFB99"
+          }
+        ],
+        "/PolyautomateStack/ResearcherSecurityGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherSecurityGroup0DB75941"
+          }
+        ],
+        "/PolyautomateStack/DailyResearcherRun/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "DailyResearcherRun9531503E"
+          }
+        ],
+        "/PolyautomateStack/AlarmResearcherRun/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AlarmResearcherRun7C5B098B"
+          }
+        ],
+        "/PolyautomateStack/ExecutorEcrUri": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorEcrUri"
+          }
+        ],
+        "/PolyautomateStack/ResearcherEcrUri": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherEcrUri"
+          }
+        ],
+        "/PolyautomateStack/ExecutorLogGroupName": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorLogGroupName"
+          }
+        ],
+        "/PolyautomateStack/ResearcherLogGroupName": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherLogGroupName"
+          }
+        ],
+        "/PolyautomateStack/ActionAlarmName": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ActionAlarmName"
+          }
+        ],
+        "/PolyautomateStack/ExecutorCredentialsSecretArn": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorCredentialsSecretArn"
+          }
+        ],
+        "/PolyautomateStack/ResearcherCredentialsSecretArn": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherCredentialsSecretArn"
+          }
+        ],
+        "/PolyautomateStack/CDKMetadata/Default": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CDKMetadata"
+          }
+        ],
+        "/PolyautomateStack/CDKMetadata/Condition": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CDKMetadataAvailable"
+          }
+        ],
+        "/PolyautomateStack/BootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BootstrapVersion"
+          }
+        ],
+        "/PolyautomateStack/CheckBootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CheckBootstrapVersion"
+          }
+        ]
+      },
+      "displayName": "PolyautomateStack"
+    },
+    "Tree": {
+      "type": "cdk:tree",
+      "properties": {
+        "file": "tree.json"
+      }
+    }
+  }
+}
