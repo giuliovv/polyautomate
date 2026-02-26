@@ -24,6 +24,9 @@ Hard filters (applied before scoring)
 * current_price < 0.04 or > 0.96  (near certainty)
 * days_to_resolution < 2           (too close to resolution)
 * fewer than 10 price bars in the look-back window (not enough data)
+* avg bid-ask spread > max_spread  (default 3 pp).  Wide spreads make it
+  structurally impossible to profit at typical TP levels (e.g. a 9 pp
+  spread requires a 15 pp move to clear a 6 pp TP).
 
 Usage
 -----
@@ -72,6 +75,9 @@ MIN_PRICE        = 0.04     # skip near-zero tokens
 MAX_PRICE        = 0.96     # skip near-certain tokens
 MIN_DAYS_LEFT    = 2        # skip markets resolving very soon
 MIN_BARS         = 10       # skip markets with very little price history
+MAX_SPREAD       = 0.03     # skip markets with avg bid-ask spread > 3 pp
+MAX_REL_SPREAD   = 0.15     # skip if spread / price > 15 % (e.g. 2 pp on a
+                            # 0.12 market = 17 % → structurally untradeable)
 
 
 # ── Data model ─────────────────────────────────────────────────────────────────
@@ -84,6 +90,7 @@ class MarketScore:
     current_price:   float
     price_range:     float          # max − min over look-back
     avg_liquidity:   float          # mean of /metrics liquidity values
+    avg_spread:      float          # mean of /metrics spread values (probability pts)
     days_left:       float
 
     # Normalised sub-scores (all in [0, 1])
@@ -165,6 +172,12 @@ def _avg_liquidity(metrics: list[dict]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
+def _avg_spread(metrics: list[dict]) -> float:
+    """Average the 'spread' field from /metrics bars (bid-ask spread in prob pts)."""
+    values = [float(m["spread"]) for m in metrics if "spread" in m]
+    return sum(values) / len(values) if values else 0.0
+
+
 def _score(ms: MarketScore) -> None:
     """Fill sub-scores and composite in-place."""
     ms.s_liquidity = min(1.0, ms.avg_liquidity / REF_LIQUIDITY)
@@ -188,6 +201,8 @@ def screen_markets(
     lookback_days: int = 7,
     search: str | None = None,
     tags: list[str] | None = None,
+    max_spread: float = MAX_SPREAD,
+    max_rel_spread: float = MAX_REL_SPREAD,
     verbose: bool = True,
 ) -> list[MarketScore]:
     """
@@ -203,16 +218,23 @@ def screen_markets(
     if verbose:
         print(f"Fetching up to {candidates} active markets…")
 
-    market_list = list(client.list_markets(
-        search=search,
-        tags=tags,
-        sort="volume",
-        order="desc",
-        limit=candidates,
-    ))
+    # end_date_min=now: only return markets whose scheduled end is in the future
+    # (avoids filling the list with recently-closed short-duration markets).
+    # We still filter out early-resolved markets below via status check.
+    market_list = [
+        m for m in client.list_markets(
+            search=search,
+            tags=tags,
+            sort="updated_at",
+            order="desc",
+            end_date_min=now.isoformat(),
+            limit=candidates * 3,   # overfetch; many will be filtered
+        )
+        if m.get("status") not in ("closed", "resolved")
+    ][:candidates]
 
     if verbose:
-        print(f"Scoring {len(market_list)} markets (look-back: {lookback_days}d @ 6h)…\n")
+        print(f"Scoring {len(market_list)} open markets (look-back: {lookback_days}d @ 6h)…\n")
 
     results: list[MarketScore] = []
 
@@ -266,12 +288,34 @@ def screen_markets(
 
         price_range = _price_range(prices)
 
-        # ── Metrics (liquidity) ─────────────────────────────────────────
+        # ── Metrics (liquidity + spread) ────────────────────────────────
         try:
             metrics = client.get_metrics(slug, start_ts, end_ts, "6h")
             avg_liq = _avg_liquidity(metrics)
+            avg_sprd = _avg_spread(metrics)
         except PMDError:
-            avg_liq = 0.0   # missing metrics → liquidity score = 0, but don't skip
+            avg_liq  = 0.0
+            avg_sprd = 0.0
+
+        # Hard filter: spread too wide to be tradeable at typical TP levels
+        if avg_sprd > max_spread:
+            if verbose:
+                print(f"  [{i:>3}] SKIP  {question[:55]}  "
+                      f"(spread={avg_sprd:.3f} > {max_spread:.3f})")
+            continue
+
+        # Hard filter: spread too large relative to current price.
+        # A 2.7 pp spread on a 0.15 market = 18 % round-trip cost vs the
+        # Yes price, which makes it structurally impossible to profit even
+        # when the signal is right (e.g. TP=8 pp but spread consumes half).
+        # Use min(p, 1-p) so both the Yes side and No side are checked;
+        # the cheaper token is the one with the worst relative spread.
+        rel_spread = avg_sprd / min(current_price, 1 - current_price)
+        if rel_spread > max_rel_spread:
+            if verbose:
+                print(f"  [{i:>3}] SKIP  {question[:55]}  "
+                      f"(rel_spread={rel_spread:.2%} > {max_rel_spread:.0%})")
+            continue
 
         ms = MarketScore(
             slug=slug,
@@ -280,6 +324,7 @@ def screen_markets(
             current_price=current_price,
             price_range=price_range,
             avg_liquidity=avg_liq,
+            avg_spread=avg_sprd,
             days_left=days_left,
         )
         _score(ms)
@@ -288,9 +333,9 @@ def screen_markets(
         if verbose:
             end_str = end_date.strftime("%Y-%m-%d") if end_date else "unknown"
             print(
-                f"  [{i:>3}]  {ms.composite:.3f}  {question[:52]:<52}  "
+                f"  [{i:>3}]  {ms.composite:.3f}  {question[:48]:<48}  "
                 f"p={current_price:.2f}  rng={price_range:.3f}  "
-                f"liq=${avg_liq:>8,.0f}  end={end_str}"
+                f"sprd={avg_sprd:.3f}  liq=${avg_liq:>8,.0f}  end={end_str}"
             )
 
     # Sort by composite score descending; errors go last
@@ -308,7 +353,7 @@ def print_table(scores: list[MarketScore], top: int) -> None:
 
     hdr = (
         f"  {'#':>3}  {'Score':>5}  {'Liq':>4}  {'Mov':>4}  {'Time':>4}  {'Pos':>4}  "
-        f"{'Price':>5}  {'Range':>5}  {'DaysLeft':>8}  Question"
+        f"{'Price':>5}  {'Range':>5}  {'Spread':>6}  {'DaysLeft':>8}  Question"
     )
     print("\n" + "=" * len(hdr))
     print("Top markets for WhaleWatcher")
@@ -323,13 +368,14 @@ def print_table(scores: list[MarketScore], top: int) -> None:
             f"{ms.s_liquidity:.2f}  {ms.s_movement:.2f}  "
             f"{ms.s_time:.2f}  {ms.s_position:.2f}  "
             f"{ms.current_price:>5.2f}  {ms.price_range:>5.3f}  "
-            f"{ms.days_left:>8.1f}  {ms.question[:60]}"
+            f"{ms.avg_spread:>6.3f}  {ms.days_left:>8.1f}  {ms.question[:55]}"
         )
 
     print()
-    print("Columns: Score=composite  Liq/Mov/Time/Pos=sub-scores (0–1)")
+    print("Columns: Score=composite  Liq/Mov/Time/Pos=sub-scores (0–1)  Spread=avg bid-ask (pp)")
     print(f"Weights: liquidity={W_LIQUIDITY}  movement={W_MOVEMENT}  "
-          f"time={W_TIME}  position={W_POSITION}")
+          f"time={W_TIME}  position={W_POSITION}  |  "
+          f"hard filters: spread≤{MAX_SPREAD:.2f}  rel_spread≤{MAX_REL_SPREAD:.0%}")
 
 
 def print_slugs(scores: list[MarketScore], top: int) -> None:
@@ -354,6 +400,12 @@ def parse_args() -> argparse.Namespace:
                    help="Free-text filter applied when listing markets")
     p.add_argument("--tags",       nargs="+", default=None,
                    help="Tag filter(s) e.g. --tags politics economics")
+    p.add_argument("--max-spread", type=float, default=MAX_SPREAD,
+                   help=f"Hard filter: skip markets with avg bid-ask spread > this "
+                        f"(probability pts, default: {MAX_SPREAD})")
+    p.add_argument("--max-rel-spread", type=float, default=MAX_REL_SPREAD,
+                   help=f"Hard filter: skip if spread / price > this fraction "
+                        f"(default: {MAX_REL_SPREAD:.0%})")
     p.add_argument("--slugs-only", action="store_true",
                    help="Print only the top market slugs (one per line) — "
                         "useful for piping into granularity_sweep.py")
@@ -376,6 +428,8 @@ def main() -> None:
         lookback_days=args.days,
         search=args.search,
         tags=args.tags,
+        max_spread=args.max_spread,
+        max_rel_spread=args.max_rel_spread,
         verbose=not args.quiet and not args.slugs_only,
     )
 

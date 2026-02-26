@@ -150,6 +150,7 @@ class BacktestEngine:
         take_profit: float = 0.10,
         hold_periods: int = 24,
         position_size: float = 100.0,
+        fee_rate: float = 0.0,
     ) -> BacktestResult:
         """
         Run a strategy over a historical window and return trade statistics.
@@ -176,6 +177,21 @@ class BacktestEngine:
             Maximum number of bars to hold a position before forcing exit.
         position_size:
             Notional size per trade (used only for dollar P&L reporting).
+        fee_rate:
+            Explicit taker fee charged on each leg of the trade (entry + exit),
+            as a fraction of notional. Default 0.0.
+
+            Bid-ask spread friction is now modelled directly: entries execute at
+            the best ask (BUY) or best bid (SELL), and exits at the opposite side.
+            This parameter covers only explicit platform fees on top of the spread.
+
+            Polymarket fee reality (see docs.polymarket.com/trading/fees):
+            - Macro / political / general markets: **no fee** → leave at 0.0
+            - 5/15-min crypto markets: fee = shares × 0.25 × (p×(1-p))² → max ~1.56% at p=0.50
+            - NCAAB / Serie A sports: fee = shares × 0.0175 × (p×(1-p)) → max ~0.44% at p=0.50
+
+            The simplified flat model (fee_rate × notional per leg) is an approximation
+            because the real formula is price-dependent.
 
         Returns
         -------
@@ -240,18 +256,21 @@ class BacktestEngine:
                     open_trade, price, stop_loss, take_profit, hold_periods
                 )
                 if exit_reason:
+                    exec_exit = _exit_exec_price(open_trade.signal.signal, book, price)
                     trade = Trade(
                         signal=open_trade.signal,
                         entry_price=open_trade.entry_price,
-                        exit_price=price,
+                        exit_price=exec_exit,
                         exit_timestamp=ts,
                         exit_reason=exit_reason,
+                        fee_rate=fee_rate,
                     )
                     result.trades.append(trade)
                     logger.debug(
-                        "Exit  %s @ %.4f  [%s]  pnl=%.4f",
+                        "Exit  %s mid=%.4f exec=%.4f  [%s]  pnl=%.4f",
                         open_trade.signal.signal.value,
                         price,
+                        exec_exit,
                         exit_reason,
                         trade.pnl,
                     )
@@ -267,11 +286,18 @@ class BacktestEngine:
                     book_history=list(book_window),
                 )
                 if signal is not None and signal.signal != Signal.HOLD:
-                    open_trade = _OpenPosition(signal=signal, entry_price=price, bars_held=0)
+                    exec_entry = _entry_exec_price(signal.signal, book, price)
+                    open_trade = _OpenPosition(
+                        signal=signal,
+                        entry_price=exec_entry,
+                        entry_mid=price,
+                        bars_held=0,
+                    )
                     logger.debug(
-                        "Entry %s @ %.4f  conf=%.2f",
+                        "Entry %s mid=%.4f exec=%.4f  conf=%.2f",
                         signal.signal.value,
                         price,
+                        exec_entry,
                         signal.confidence,
                     )
 
@@ -280,14 +306,18 @@ class BacktestEngine:
 
         # Close any position still open at end of data (price_series already normalised)
         if open_trade is not None and price_series:
-            last_price = price_series[-1]["price"]
-            last_ts = price_series[-1]["ts"]
+            last_bar = price_series[-1]
+            last_price = last_bar["price"]
+            last_ts = last_bar["ts"]
+            last_book = book_by_ts.get(last_ts, {"ts": last_ts, "bids": [], "asks": []})
+            exec_exit = _exit_exec_price(open_trade.signal.signal, last_book, last_price)
             trade = Trade(
                 signal=open_trade.signal,
                 entry_price=open_trade.entry_price,
-                exit_price=last_price,
+                exit_price=exec_exit,
                 exit_timestamp=last_ts,
                 exit_reason="end_of_data",
+                fee_rate=fee_rate,
             )
             result.trades.append(trade)
 
@@ -361,12 +391,66 @@ class BacktestEngine:
 # Internal helpers
 # ------------------------------------------------------------------
 
-class _OpenPosition:
-    __slots__ = ("signal", "entry_price", "bars_held")
 
-    def __init__(self, signal: TradeSignal, entry_price: float, bars_held: int) -> None:
+def _best_bid(book: dict) -> float | None:
+    """Return the highest bid price from a book snapshot, or None if empty.
+
+    Uses max() over all levels rather than assuming a fixed sort order, because
+    the polymarketdata API returns bids in ascending price order (worst first)
+    despite the docs suggesting best-first.
+    """
+    bids = book.get("bids", [])
+    return max(float(b[0]) for b in bids) if bids else None
+
+
+def _best_ask(book: dict) -> float | None:
+    """Return the lowest ask price from a book snapshot, or None if empty.
+
+    Uses min() over all levels rather than assuming a fixed sort order, because
+    the polymarketdata API returns asks in descending price order (worst first)
+    despite the docs suggesting best-first.
+    """
+    asks = book.get("asks", [])
+    return min(float(a[0]) for a in asks) if asks else None
+
+
+def _entry_exec_price(signal: Signal, book: dict, mid: float) -> float:
+    """
+    Realistic entry execution price:
+    - BUY  → pay the ask (taker lifting the offer)
+    - SELL → receive the bid (taker hitting the bid)
+    Falls back to mid-price when the relevant side of the book is empty.
+    """
+    if signal == Signal.BUY:
+        return _best_ask(book) or mid
+    return _best_bid(book) or mid
+
+
+def _exit_exec_price(signal: Signal, book: dict, mid: float) -> float:
+    """
+    Realistic exit execution price (opposite side to entry):
+    - BUY exit  → sell at the bid
+    - SELL exit → buy back at the ask
+    Falls back to mid-price when the relevant side of the book is empty.
+    """
+    if signal == Signal.BUY:
+        return _best_bid(book) or mid
+    return _best_ask(book) or mid
+
+
+class _OpenPosition:
+    __slots__ = ("signal", "entry_price", "entry_mid", "bars_held")
+
+    def __init__(
+        self,
+        signal: TradeSignal,
+        entry_price: float,
+        entry_mid: float,
+        bars_held: int,
+    ) -> None:
         self.signal = signal
-        self.entry_price = entry_price
+        self.entry_price = entry_price  # actual execution price (ask or bid)
+        self.entry_mid = entry_mid      # mid-price at entry — used for exit triggers
         self.bars_held = bars_held
 
 
@@ -377,9 +461,14 @@ def _check_exit(
     take_profit: float,
     hold_periods: int,
 ) -> str | None:
-    """Return the exit reason string if the position should be closed, else None."""
+    """Return the exit reason string if the position should be closed, else None.
+
+    Triggers are compared against the mid-price at entry (``pos.entry_mid``) so
+    that stop/take-profit levels are defined in clean probability-point terms,
+    independent of the bid-ask spread captured in the execution prices.
+    """
     is_buy = pos.signal.signal == Signal.BUY
-    price_move = current_price - pos.entry_price
+    price_move = current_price - pos.entry_mid
     directional_move = price_move if is_buy else -price_move
 
     if directional_move >= take_profit:

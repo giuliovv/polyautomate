@@ -68,6 +68,7 @@ TAKE_PROFIT  = 0.08
 HOLD_PERIODS = 24           # max 24 bars = 24 hours
 
 RESOLUTION   = "1h"
+MAX_SPREAD   = 0.03     # hard filter: skip markets with avg spread > 3 pp
 
 
 # ── Data model ─────────────────────────────────────────────────────────────────
@@ -83,6 +84,7 @@ class ScanResult:
     win_rate:    float = 0.0
     total_pnl:   float = 0.0
     sharpe:      float = 0.0
+    avg_spread:  float = 0.0
     exit_reasons: dict = field(default_factory=dict)
 
     error:       str   = ""
@@ -170,6 +172,10 @@ def run_scan(
     window_days: int = 30,
     cache_dir: str = ".cache/backtest",
     verbose: bool = True,
+    stop_loss: float = STOP_LOSS,
+    take_profit: float = TAKE_PROFIT,
+    fee_rate: float = 0.0,
+    max_spread: float = MAX_SPREAD,
 ) -> list[ScanResult]:
     """
     Run WhaleWatcher on every resolved market from the last *resolved_days* days.
@@ -177,6 +183,17 @@ def run_scan(
     For each market, the backtest window is *window_days* before the
     market's end_date (capped at start_date if available), ending 2 hours
     before resolution to avoid trading into the binary resolution spike.
+
+    Parameters
+    ----------
+    stop_loss:   Exit threshold in probability points. Default: STOP_LOSS constant.
+    take_profit: Exit threshold in probability points. Default: TAKE_PROFIT constant.
+    fee_rate:    Round-trip fee per leg (e.g. 0.02 = 2% per side). Default: 0.0.
+    max_spread:  Hard filter: skip markets whose avg bid-ask spread exceeds this
+                 value (probability pts). Default: MAX_SPREAD constant (3 pp).
+                 Wide spreads make it structurally impossible to profit at typical
+                 TP levels — e.g. a 9 pp spread requires a 15 pp move to clear a
+                 6 pp TP.
     """
     now           = datetime.now(timezone.utc)
     resolved_since = now - timedelta(days=resolved_days)
@@ -184,10 +201,11 @@ def run_scan(
     engine = BacktestEngine(client, cache_dir=cache_dir)
 
     if verbose:
+        fee_str = f"  fee={fee_rate:.1%}" if fee_rate else ""
         print(f"Scanning resolved markets: {resolved_since.date()} → {now.date()}")
         print(f"Backtest window per market: {window_days}d @ {RESOLUTION}")
         print(f"Strategy: WhaleWatcher  z={STRATEGY_PARAMS['whale_z_threshold']}  "
-              f"sl={STOP_LOSS}  tp={TAKE_PROFIT}  hold={HOLD_PERIODS}h\n")
+              f"sl={stop_loss}  tp={take_profit}  hold={HOLD_PERIODS}h{fee_str}\n")
 
     markets = list(_fetch_resolved_markets(client, universe_size, resolved_since, now))
 
@@ -216,18 +234,38 @@ def run_scan(
             results.append(sr)
             continue
 
-        token, closed_at = _discover_market_info(client, slug)
+        token, _ = _discover_market_info(client, slug)
 
-        # Use the actual close time if available — more accurate than end_date
-        # for markets that resolve early (eSports, news events).
-        resolution_ts = min(t for t in (end_date, closed_at) if t is not None)
-        bt_end   = resolution_ts - timedelta(hours=2)
+        # Use end_date (the scheduled close) as the backtest cutoff — this is
+        # the only information available in live trading; closed_at is only
+        # known after the fact and would introduce look-ahead bias.
+        bt_end   = end_date - timedelta(hours=2)
         bt_start = bt_end - timedelta(days=window_days)
         if bt_end > now:
             bt_end = now
         if bt_start >= bt_end:
             sr.skipped = "window too short"
             results.append(sr)
+            continue
+
+        # ---- Spread pre-filter (lightweight metrics fetch) ----
+        try:
+            metrics_sample = client.get_metrics(slug, bt_start.isoformat(), bt_end.isoformat(), "6h")
+            spreads = [float(m["spread"]) for m in metrics_sample if "spread" in m]
+            avg_sprd = sum(spreads) / len(spreads) if spreads else 0.0
+        except PMDError:
+            avg_sprd = 0.0
+
+        sr.avg_spread = avg_sprd
+
+        if avg_sprd > max_spread:
+            sr.skipped = f"spread={avg_sprd:.3f}>{max_spread:.3f}"
+            results.append(sr)
+            if verbose:
+                tag_str = ",".join(tags[:3]) or "—"
+                end_str = end_date.strftime("%Y-%m-%d") if end_date else "?"
+                print(f"  [{i:>3}/{len(markets)}]  {'SKIP: ' + sr.skipped:<40}  "
+                      f"{question[:45]:<45}  [{tag_str}]  end={end_str}")
             continue
 
         strat = WhaleWatcherStrategy(**STRATEGY_PARAMS)
@@ -240,9 +278,10 @@ def run_scan(
                 start_ts=bt_start.isoformat(),
                 end_ts=bt_end.isoformat(),
                 resolution=RESOLUTION,
-                stop_loss=STOP_LOSS,
-                take_profit=TAKE_PROFIT,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
                 hold_periods=HOLD_PERIODS,
+                fee_rate=fee_rate,
             )
             sr.n_trades    = r.n_trades
             sr.win_rate    = r.win_rate
@@ -368,7 +407,7 @@ def save_csv(results: list[ScanResult], path: str) -> None:
     fields = [
         "slug", "question", "tags", "end_date",
         "n_trades", "win_rate", "total_pnl", "sharpe",
-        "exit_reasons", "error", "skipped",
+        "avg_spread", "exit_reasons", "error", "skipped",
     ]
     with open(path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields)
@@ -383,6 +422,7 @@ def save_csv(results: list[ScanResult], path: str) -> None:
                 "win_rate":     f"{r.win_rate:.4f}",
                 "total_pnl":    f"{r.total_pnl:.6f}",
                 "sharpe":       f"{r.sharpe:.4f}",
+                "avg_spread":   f"{r.avg_spread:.4f}",
                 "exit_reasons": str(r.exit_reasons),
                 "error":        r.error,
                 "skipped":      r.skipped,
@@ -404,6 +444,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--window",        type=int, default=30,
                    help="Backtest window in days before each market's resolution (default: 30)")
     p.add_argument("--cache-dir",     default=".cache/backtest")
+    p.add_argument("--max-spread",    type=float, default=MAX_SPREAD,
+                   help=f"Hard filter: skip markets with avg bid-ask spread > this "
+                        f"(prob pts, default: {MAX_SPREAD})")
     p.add_argument("--triggered-only", action="store_true",
                    help="Only print markets that generated ≥1 trade")
     p.add_argument("--csv",           default=None,
@@ -428,6 +471,7 @@ def main() -> None:
         window_days=args.window,
         cache_dir=args.cache_dir,
         verbose=not args.quiet,
+        max_spread=args.max_spread,
     )
 
     if args.triggered_only:

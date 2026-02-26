@@ -105,6 +105,20 @@ def momentum(prices: list[float], period: int = 10) -> float | None:
     return (prices[-1] - base) / base
 
 
+def trend_slope(prices: list[float], period: int = 24) -> float | None:
+    """
+    Net price change over the last ``period`` bars (in probability points).
+
+    Returns ``prices[-1] - prices[-period-1]``, or ``None`` when there is not
+    enough history.  A positive value indicates an upward trend; negative
+    indicates a downward trend.  The magnitude reflects how far the market has
+    moved, making it easy to compare against an absolute threshold.
+    """
+    if len(prices) < period + 1:
+        return None
+    return prices[-1] - prices[-(period + 1)]
+
+
 def realized_vol(prices: list[float], period: int = 24) -> float | None:
     """Sample std-dev of log-returns over the last ``period`` bars."""
     if len(prices) < period + 1:

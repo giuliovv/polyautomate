@@ -45,13 +45,19 @@ Optional filters
 
 * ``min_price`` / ``max_price``: Skip near-resolution extreme prices where
   momentum assumptions break down.  Defaults 0.03 / 0.97.
+
+* ``trend_filter``: When True, suppress crossover signals that contradict a
+  strong prevailing trend.  A bearish crossover (SELL) inside a strong
+  uptrend is suppressed; a bullish crossover (BUY) inside a strong downtrend
+  is suppressed.  Prevents early counter-trend entries on the first
+  retracement during a sustained directional move.  Default False.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from ..indicators import book_pressure, macd, momentum
+from ..indicators import book_pressure, macd, momentum, trend_slope
 from ..models import Signal, TradeSignal
 from ..strategy import BaseStrategy
 
@@ -85,6 +91,14 @@ class MACDMomentumStrategy(BaseStrategy):
         Skip bars where price < min_price.  Default 0.03.
     max_price:
         Skip bars where price > max_price.  Default 0.97.
+    trend_filter:
+        If True, block crossover signals that contradict a strong trend.
+        Default False.
+    trend_lookback:
+        Number of bars over which to measure the trend.  Default 24.
+    trend_threshold:
+        Minimum net price change (probability points) to consider the trend
+        strong enough to block a counter-trend signal.  Default 0.05.
     """
 
     def __init__(
@@ -100,6 +114,9 @@ class MACDMomentumStrategy(BaseStrategy):
         book_depth: int = 5,
         min_price: float = 0.03,
         max_price: float = 0.97,
+        trend_filter: bool = False,
+        trend_lookback: int = 24,
+        trend_threshold: float = 0.05,
     ) -> None:
         self.macd_fast = macd_fast
         self.macd_slow = macd_slow
@@ -111,6 +128,9 @@ class MACDMomentumStrategy(BaseStrategy):
         self.book_depth = book_depth
         self.min_price = min_price
         self.max_price = max_price
+        self.trend_filter = trend_filter
+        self.trend_lookback = trend_lookback
+        self.trend_threshold = trend_threshold
 
         # Tracks the histogram sign from the previous bar to detect crossovers
         self._prev_histogram: float | None = None
@@ -136,6 +156,9 @@ class MACDMomentumStrategy(BaseStrategy):
             "book_depth": self.book_depth,
             "min_price": self.min_price,
             "max_price": self.max_price,
+            "trend_filter": self.trend_filter,
+            "trend_lookback": self.trend_lookback,
+            "trend_threshold": self.trend_threshold,
         }
 
     def on_step(
@@ -174,6 +197,18 @@ class MACDMomentumStrategy(BaseStrategy):
         # ---- Minimum histogram magnitude filter ----
         if abs(hist) < self.min_histogram:
             return None
+
+        # ---- Optional trend filter ----
+        # Suppress crossovers that fire against a strong prevailing trend.
+        # A bearish crossover (sell) during a strong uptrend is usually a
+        # brief pause, not a reversal — taking the trade leads to stop-outs.
+        if self.trend_filter:
+            slope = trend_slope(price_history, self.trend_lookback)
+            if slope is not None:
+                if bearish_cross and slope >= self.trend_threshold:
+                    return None  # bearish cross inside uptrend — skip SELL
+                if bullish_cross and slope <= -self.trend_threshold:
+                    return None  # bullish cross inside downtrend — skip BUY
 
         # ---- Optional momentum confirmation ----
         mom: float | None = None
