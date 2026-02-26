@@ -99,6 +99,72 @@ def _normalize_state(state: dict) -> dict:
     return state
 
 
+def _extract_token_price(market: dict, outcome: str) -> float | None:
+    for token in market.get("tokens", []) or []:
+        if not isinstance(token, dict):
+            continue
+        label = str(token.get("outcome") or token.get("label") or token.get("name") or "").strip().lower()
+        if label != outcome.lower():
+            continue
+        raw = token.get("price") or token.get("last_price") or token.get("lastPrice")
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _fetch_latest_no_price(client: PMDClient, slug: str, now: datetime) -> float | None:
+    start = now - timedelta(days=7)
+    try:
+        prices = client.get_prices(slug, start.isoformat(), now.isoformat(), resolution="1h")
+    except PMDError:
+        return None
+    no_points = prices.get("No") or prices.get("NO") or []
+    return _latest_price(no_points)
+
+
+def _evaluate_guardrail(state: dict, now: datetime) -> str | None:
+    if os.getenv("LONGSHOT_GUARDRAIL_ENABLED", "1") != "1":
+        return None
+    window = int(os.getenv("LONGSHOT_GUARDRAIL_WINDOW_TRADES", "12"))
+    min_trades = int(os.getenv("LONGSHOT_GUARDRAIL_MIN_TRADES", "4"))
+    min_pnl = float(os.getenv("LONGSHOT_GUARDRAIL_MIN_PNL_USD", "-5"))
+    min_win_rate = float(os.getenv("LONGSHOT_GUARDRAIL_MIN_WIN_RATE", "0.35"))
+    cooldown_min = int(os.getenv("LONGSHOT_GUARDRAIL_COOLDOWN_MIN", "180"))
+
+    closed = [p for p in state.get("closed_positions", []) if p.get("pnl_usd") is not None]
+    if len(closed) < min_trades:
+        return None
+    recent = closed[-window:]
+    pnls = [float(p["pnl_usd"]) for p in recent]
+    total_pnl = sum(pnls)
+    wins = sum(1 for p in pnls if p > 0)
+    win_rate = wins / max(len(pnls), 1)
+
+    breached = total_pnl <= min_pnl or win_rate < min_win_rate
+    if not breached:
+        return None
+
+    last_alert_at = state.get("guardrail_last_alert_at")
+    if last_alert_at:
+        try:
+            last_dt = datetime.fromisoformat(str(last_alert_at).replace("Z", "+00:00"))
+            if last_dt.tzinfo is None:
+                last_dt = last_dt.replace(tzinfo=timezone.utc)
+            if (now - last_dt) < timedelta(minutes=cooldown_min):
+                return None
+        except ValueError:
+            pass
+
+    state["guardrail_last_alert_at"] = now.isoformat()
+    return (
+        "performance_guardrail_breached "
+        f"trades={len(pnls)} total_pnl={total_pnl:.4f} win_rate={win_rate:.3f} "
+        f"thresholds[min_pnl={min_pnl:.4f},min_win_rate={min_win_rate:.3f}]"
+    )
+
+
 def _extract_token_ids(market: dict) -> tuple[str | None, str | None]:
     yes_token = None
     no_token = None
@@ -328,6 +394,14 @@ def run_once() -> int:
             or market.get("resolutionDate")
         )
         if status in {"resolved", "closed"}:
+            close_no = _extract_token_price(market, "no")
+            if close_no is None:
+                close_no = _fetch_latest_no_price(pmd, slug, now)
+            entry_no = float(pos.get("no_price", 0.0))
+            size = float(pos.get("entry_order_size", 0.0))
+            pnl = None if close_no is None else (close_no - entry_no) * size
+            pos["close_no_price"] = close_no
+            pos["pnl_usd"] = pnl
             pos["closed_at"] = now.isoformat()
             pos["closed_reason"] = status
             state["closed_positions"].append(pos)
@@ -338,6 +412,11 @@ def run_once() -> int:
             pos["closed_reason"] = "end_date_elapsed"
             state["closed_positions"].append(pos)
             del open_positions[slug]
+
+    guardrail_error = _evaluate_guardrail(state, now)
+    if guardrail_error:
+        _save_state(state_path, state)
+        raise RuntimeError(guardrail_error)
 
     candidates = _scan_candidates(
         pmd,
