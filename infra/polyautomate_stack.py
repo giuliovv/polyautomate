@@ -93,7 +93,7 @@ class PolyautomateStack(cdk.Stack):
             "ExecutorCredentialsSecret",
             description="Executor runtime credentials for Polymarket trading",
             generate_secret_string=secretsmanager.SecretStringGenerator(
-                secret_string_template='{"POLYMARKET_API_KEY":"REPLACE_ME","POLYMARKET_PASSPHRASE":"REPLACE_ME","POLYMARKET_SIGNING_KEY":"REPLACE_ME","POLYMARKETDATA_API_KEY":"REPLACE_ME","EXECUTOR_GITHUB_TOKEN":"REPLACE_ME"}',
+                secret_string_template='{"POLYMARKET_API_KEY":"REPLACE_ME","POLYMARKET_PASSPHRASE":"REPLACE_ME","POLYMARKET_SIGNING_KEY":"REPLACE_ME","POLYMARKETDATA_API_KEY":"REPLACE_ME","TELEGRAM_BOT_TOKEN":"REPLACE_ME","TELEGRAM_CHAT_ID":"REPLACE_ME","EXECUTOR_GITHUB_TOKEN":"REPLACE_ME"}',
                 generate_string_key="bootstrap",
             ),
         )
@@ -228,6 +228,8 @@ POLYMARKET_API_KEY="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; 
 POLYMARKET_PASSPHRASE="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_PASSPHRASE", ""))')"
 POLYMARKET_SIGNING_KEY="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_SIGNING_KEY", ""))')"
 POLYMARKETDATA_API_KEY="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKETDATA_API_KEY", ""))')"
+TELEGRAM_BOT_TOKEN="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("TELEGRAM_BOT_TOKEN", ""))')"
+TELEGRAM_CHAT_ID="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("TELEGRAM_CHAT_ID", ""))')"
 GITHUB_TOKEN="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("EXECUTOR_GITHUB_TOKEN", ""))')"
 if [[ "$GITHUB_TOKEN" == "REPLACE_ME" || "$GITHUB_TOKEN" == "null" ]]; then
   GITHUB_TOKEN=""
@@ -268,6 +270,8 @@ if [[ "$DESIRED_SIG" != "$CURRENT_SIG" ]]; then
     -e POLYMARKET_PASSPHRASE="$POLYMARKET_PASSPHRASE" \
     -e POLYMARKET_SIGNING_KEY="$POLYMARKET_SIGNING_KEY" \
     -e POLYMARKETDATA_API_KEY="$POLYMARKETDATA_API_KEY" \
+    -e TELEGRAM_BOT_TOKEN="$TELEGRAM_BOT_TOKEN" \
+    -e TELEGRAM_CHAT_ID="$TELEGRAM_CHAT_ID" \
     -e LONGSHOT_THRESHOLD="$LONGSHOT_THRESHOLD" \
     -e LONGSHOT_MIN_DAYS_LEFT="$LONGSHOT_MIN_DAYS_LEFT" \
     -e LONGSHOT_MAX_SPREAD="$LONGSHOT_MAX_SPREAD" \

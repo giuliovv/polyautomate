@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import requests
+
 from polyautomate.clients.polymarketdata import PMDClient, PMDError
 from polyautomate.clients.trading import PolymarketTradingClient
 from polyautomate.models import OrderRequest
@@ -99,6 +101,18 @@ def _normalize_state(state: dict) -> dict:
     return state
 
 
+def _send_telegram_message(text: str) -> None:
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
+    if not token or not chat_id:
+        return
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    try:
+        requests.post(url, json={"chat_id": chat_id, "text": text}, timeout=10).raise_for_status()
+    except Exception:
+        LOGGER.exception("telegram_send_failed")
+
+
 def _extract_token_price(market: dict, outcome: str) -> float | None:
     for token in market.get("tokens", []) or []:
         if not isinstance(token, dict):
@@ -158,11 +172,13 @@ def _evaluate_guardrail(state: dict, now: datetime) -> str | None:
             pass
 
     state["guardrail_last_alert_at"] = now.isoformat()
-    return (
+    message = (
         "performance_guardrail_breached "
         f"trades={len(pnls)} total_pnl={total_pnl:.4f} win_rate={win_rate:.3f} "
         f"thresholds[min_pnl={min_pnl:.4f},min_win_rate={min_win_rate:.3f}]"
     )
+    _send_telegram_message(f"Executor guardrail breached.\n{message}")
+    return message
 
 
 def _extract_token_ids(market: dict) -> tuple[str | None, str | None]:
@@ -509,6 +525,15 @@ def run_once() -> int:
                 f"{sizing.no_win_prob:.3f}" if sizing.no_win_prob is not None else "na",
                 f"{sizing.full_kelly:.4f}" if sizing.full_kelly is not None else "na",
                 f"{sizing.applied_fraction:.4f}" if sizing.applied_fraction is not None else "na",
+            )
+            _send_telegram_message(
+                "Executor operation submitted.\n"
+                f"slug={c.slug}\n"
+                f"order_id={ack.order_id} status={ack.status}\n"
+                f"yes_price={c.yes_price:.4f} no_price={price:.4f}\n"
+                f"size={order_size:.4f} notional={sizing.notional_usd:.2f}\n"
+                f"kelly_f={f'{sizing.applied_fraction:.4f}' if sizing.applied_fraction is not None else 'na'} "
+                f"p_no={f'{sizing.no_win_prob:.3f}' if sizing.no_win_prob is not None else 'na'}"
             )
 
         open_positions[c.slug] = {
