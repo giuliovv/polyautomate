@@ -44,6 +44,9 @@ class Candidate:
     no_token_id: str
     yes_price: float
     no_price: float
+    end_date: datetime | None
+    avg_spread: float
+    rel_spread: float
 
 
 @dataclass
@@ -86,6 +89,16 @@ def _save_state(path: Path, state: dict) -> None:
     path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def _normalize_state(state: dict) -> dict:
+    # Backward-compat migration from previous schema.
+    if "open_positions" not in state:
+        old = state.get("traded", {})
+        state["open_positions"] = old if isinstance(old, dict) else {}
+    if "closed_positions" not in state:
+        state["closed_positions"] = []
+    return state
+
+
 def _extract_token_ids(market: dict) -> tuple[str | None, str | None]:
     yes_token = None
     no_token = None
@@ -123,6 +136,9 @@ def _scan_candidates(
     longshot_threshold: float,
     min_price: float,
     max_price: float,
+    max_spread: float,
+    max_rel_spread: float,
+    open_positions: dict,
 ) -> list[Candidate]:
     start = now - timedelta(minutes=lookback_minutes)
     candidates: list[Candidate] = []
@@ -175,6 +191,28 @@ def _scan_candidates(
             continue
         if yes_price > longshot_threshold:
             continue
+        if slug in open_positions:
+            continue
+
+        avg_spread = 0.0
+        rel_spread = 0.0
+        try:
+            metrics = client.get_metrics(slug, start.isoformat(), now.isoformat(), resolution="10m")
+            spreads = [float(m["spread"]) for m in metrics if "spread" in m and m.get("spread") is not None]
+            if spreads:
+                avg_spread = sum(spreads) / len(spreads)
+        except PMDError:
+            continue
+
+        denom = min(yes_price, 1.0 - yes_price)
+        if denom <= 0:
+            continue
+        rel_spread = avg_spread / denom
+
+        if avg_spread > max_spread:
+            continue
+        if rel_spread > max_rel_spread:
+            continue
 
         candidates.append(
             Candidate(
@@ -184,6 +222,9 @@ def _scan_candidates(
                 no_token_id=no_token_id,
                 yes_price=yes_price,
                 no_price=no_price,
+                end_date=end_date,
+                avg_spread=avg_spread,
+                rel_spread=rel_spread,
             )
         )
 
@@ -256,8 +297,8 @@ def run_once() -> int:
 
     now = datetime.now(timezone.utc)
     state_path = Path(os.getenv("LONGSHOT_STATE_PATH", "/var/lib/polyautomate/longshot-state.json"))
-    state = _load_state(state_path)
-    traded: dict = state.setdefault("traded", {})
+    state = _normalize_state(_load_state(state_path))
+    open_positions: dict = state.setdefault("open_positions", {})
 
     lookback_minutes = int(os.getenv("LONGSHOT_LOOKBACK_MINUTES", "240"))
     market_limit = int(os.getenv("LONGSHOT_MARKET_LIMIT", "120"))
@@ -265,10 +306,39 @@ def run_once() -> int:
     longshot_threshold = float(os.getenv("LONGSHOT_THRESHOLD", "0.40"))
     min_price = float(os.getenv("LONGSHOT_MIN_PRICE", "0.02"))
     max_price = float(os.getenv("LONGSHOT_MAX_PRICE", "0.96"))
+    max_spread = float(os.getenv("LONGSHOT_MAX_SPREAD", "0.03"))
+    max_rel_spread = float(os.getenv("LONGSHOT_MAX_REL_SPREAD", "0.15"))
+    hold_grace_hours = int(os.getenv("LONGSHOT_HOLD_GRACE_HOURS", "24"))
     fallback_order_size = float(os.getenv("LONGSHOT_ORDER_SIZE", "5"))
     max_actions = int(os.getenv("LONGSHOT_MAX_ACTIONS_PER_CYCLE", "1"))
 
     pmd = PMDClient(api_key=pmd_api_key)
+
+    # Hold-to-resolution: keep positions open until market resolves/closes.
+    for slug, pos in list(open_positions.items()):
+        try:
+            market = pmd.get_market(slug)
+        except PMDError:
+            continue
+        status = str(market.get("status", "")).lower()
+        end_date = _parse_dt(
+            market.get("end_date")
+            or market.get("endDate")
+            or market.get("resolution_date")
+            or market.get("resolutionDate")
+        )
+        if status in {"resolved", "closed"}:
+            pos["closed_at"] = now.isoformat()
+            pos["closed_reason"] = status
+            state["closed_positions"].append(pos)
+            del open_positions[slug]
+            continue
+        if end_date and now > (end_date + timedelta(hours=hold_grace_hours)):
+            pos["closed_at"] = now.isoformat()
+            pos["closed_reason"] = "end_date_elapsed"
+            state["closed_positions"].append(pos)
+            del open_positions[slug]
+
     candidates = _scan_candidates(
         pmd,
         now=now,
@@ -278,9 +348,19 @@ def run_once() -> int:
         longshot_threshold=longshot_threshold,
         min_price=min_price,
         max_price=max_price,
+        max_spread=max_spread,
+        max_rel_spread=max_rel_spread,
+        open_positions=open_positions,
     )
 
-    LOGGER.info("longshot_candidates count=%s threshold=%.2f", len(candidates), longshot_threshold)
+    LOGGER.info(
+        "longshot_candidates count=%s threshold=%.2f open_positions=%s max_spread=%.3f max_rel_spread=%.2f",
+        len(candidates),
+        longshot_threshold,
+        len(open_positions),
+        max_spread,
+        max_rel_spread,
+    )
     if not candidates:
         return 0
 
@@ -295,7 +375,7 @@ def run_once() -> int:
     for c in candidates:
         if actions >= max_actions:
             break
-        if c.slug in traded:
+        if c.slug in open_positions:
             continue
 
         # Longshot edge: buy NO when YES enters <= threshold.
@@ -336,13 +416,15 @@ def run_once() -> int:
             )
             ack = trader.place_order(order, post_only=True)  # type: ignore[union-attr]
             LOGGER.info(
-                "order_submitted slug=%s order_id=%s status=%s price=%.4f size=%.4f yes_price=%.4f sizing=%s notional=%.2f p_no=%s full_kelly=%s f=%s",
+                "order_submitted slug=%s order_id=%s status=%s price=%.4f size=%.4f yes_price=%.4f avg_spread=%.4f rel_spread=%.2f sizing=%s notional=%.2f p_no=%s full_kelly=%s f=%s",
                 c.slug,
                 ack.order_id,
                 ack.status,
                 price,
                 order_size,
                 c.yes_price,
+                c.avg_spread,
+                c.rel_spread,
                 sizing.method,
                 sizing.notional_usd,
                 f"{sizing.no_win_prob:.3f}" if sizing.no_win_prob is not None else "na",
@@ -350,14 +432,22 @@ def run_once() -> int:
                 f"{sizing.applied_fraction:.4f}" if sizing.applied_fraction is not None else "na",
             )
 
-        traded[c.slug] = {
+        open_positions[c.slug] = {
+            "slug": c.slug,
+            "question": c.question,
             "at": now.isoformat(),
             "yes_price": c.yes_price,
             "no_price": c.no_price,
+            "end_date": c.end_date.isoformat() if c.end_date else None,
+            "entry_order_size": order_size,
+            "entry_notional_usd": round(sizing.notional_usd, 4),
+            "avg_spread": c.avg_spread,
+            "rel_spread": c.rel_spread,
         }
         actions += 1
 
     state["last_run_at"] = now.isoformat()
     state["last_candidates"] = len(candidates)
+    state["open_position_count"] = len(open_positions)
     _save_state(state_path, state)
     return actions
