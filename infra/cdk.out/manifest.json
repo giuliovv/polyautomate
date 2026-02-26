@@ -18,7 +18,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-polyauto1-deploy-role-${AWS::AccountId}-${AWS::Region}",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-polyauto1-cfn-exec-role-${AWS::AccountId}-${AWS::Region}",
-        "stackTemplateAssetObjectUrl": "s3://cdk-polyauto1-assets-${AWS::AccountId}-${AWS::Region}/72ebe9bffac6396111c89c1500ce5adebfd7bf4fcc531a4bf9ebd2f12eb90dc8.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-polyauto1-assets-${AWS::AccountId}-${AWS::Region}/426e2daf530b53cea73b6c3819bad1189ae1c06acd02c54e55c5683be0bab8d6.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/polyauto1/version",
         "additionalDependencies": [
@@ -124,6 +124,18 @@
             "data": "ResearcherLogGroupFDAF9609"
           }
         ],
+        "/PolyautomateStack/ResearcherStateBucket/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherStateBucket1CAC0A5F"
+          }
+        ],
+        "/PolyautomateStack/ResearcherStateBucket/Policy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherStateBucketPolicyFC7CF3F7"
+          }
+        ],
         "/PolyautomateStack/ExecutorCredentialsSecret/Resource": [
           {
             "type": "aws:cdk:logicalId",
@@ -136,6 +148,12 @@
             "data": "ResearcherCredentialsSecretE874DF3C"
           }
         ],
+        "/PolyautomateStack/ExecutorErrorTopic/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorErrorTopicBCF5983F"
+          }
+        ],
         "/PolyautomateStack/ExecutorActionMetricFilter/Resource": [
           {
             "type": "aws:cdk:logicalId",
@@ -146,6 +164,18 @@
           {
             "type": "aws:cdk:logicalId",
             "data": "ExecutorActionAlarmECAAD7F7"
+          }
+        ],
+        "/PolyautomateStack/ExecutorErrorMetricFilter/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorErrorMetricFilter95B293AE"
+          }
+        ],
+        "/PolyautomateStack/ExecutorErrorAlarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorErrorAlarm4965A02B"
           }
         ],
         "/PolyautomateStack/ExecutorSecurityGroup/Resource": [
@@ -256,6 +286,36 @@
             "data": "AlarmResearcherRun7C5B098B"
           }
         ],
+        "/PolyautomateStack/ErrorTriggerFunction/ServiceRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ErrorTriggerFunctionServiceRole4404104D"
+          }
+        ],
+        "/PolyautomateStack/ErrorTriggerFunction/ServiceRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ErrorTriggerFunctionServiceRoleDefaultPolicyA1539C35"
+          }
+        ],
+        "/PolyautomateStack/ErrorTriggerFunction/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ErrorTriggerFunction4C95B8AF"
+          }
+        ],
+        "/PolyautomateStack/ErrorTriggerFunction/AllowInvoke:PolyautomateStackExecutorErrorTopicCD26E3A2": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ErrorTriggerFunctionAllowInvokePolyautomateStackExecutorErrorTopicCD26E3A26AFB7B56"
+          }
+        ],
+        "/PolyautomateStack/ErrorTriggerFunction/ExecutorErrorTopic/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ErrorTriggerFunctionExecutorErrorTopic65A9734D"
+          }
+        ],
         "/PolyautomateStack/ExecutorEcrUri": [
           {
             "type": "aws:cdk:logicalId",
@@ -284,6 +344,24 @@
           {
             "type": "aws:cdk:logicalId",
             "data": "ActionAlarmName"
+          }
+        ],
+        "/PolyautomateStack/ErrorAlarmName": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ErrorAlarmName"
+          }
+        ],
+        "/PolyautomateStack/ExecutorErrorTopicArn": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ExecutorErrorTopicArn"
+          }
+        ],
+        "/PolyautomateStack/ResearcherStateBucketName": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ResearcherStateBucketName"
           }
         ],
         "/PolyautomateStack/ExecutorCredentialsSecretArn": [

@@ -268,6 +268,88 @@
     "aws:cdk:path": "PolyautomateStack/ResearcherLogGroup/Resource"
    }
   },
+  "ResearcherStateBucket1CAC0A5F": {
+   "Type": "AWS::S3::Bucket",
+   "Properties": {
+    "BucketEncryption": {
+     "ServerSideEncryptionConfiguration": [
+      {
+       "ServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "AES256"
+       }
+      }
+     ]
+    },
+    "LifecycleConfiguration": {
+     "Rules": [
+      {
+       "NoncurrentVersionExpiration": {
+        "NoncurrentDays": 30
+       },
+       "Status": "Enabled"
+      }
+     ]
+    },
+    "VersioningConfiguration": {
+     "Status": "Enabled"
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "PolyautomateStack/ResearcherStateBucket/Resource"
+   }
+  },
+  "ResearcherStateBucketPolicyFC7CF3F7": {
+   "Type": "AWS::S3::BucketPolicy",
+   "Properties": {
+    "Bucket": {
+     "Ref": "ResearcherStateBucket1CAC0A5F"
+    },
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "s3:*",
+       "Condition": {
+        "Bool": {
+         "aws:SecureTransport": "false"
+        }
+       },
+       "Effect": "Deny",
+       "Principal": {
+        "AWS": "*"
+       },
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "ResearcherStateBucket1CAC0A5F",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "ResearcherStateBucket1CAC0A5F",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PolyautomateStack/ResearcherStateBucket/Policy/Resource"
+   }
+  },
   "ExecutorCredentialsSecretE3494440": {
    "Type": "AWS::SecretsManager::Secret",
    "Properties": {
@@ -289,13 +371,22 @@
     "Description": "Researcher runtime credentials for Claude and PolymarketData",
     "GenerateSecretString": {
      "GenerateStringKey": "bootstrap",
-     "SecretStringTemplate": "{\"ANTHROPIC_API_KEY\":\"REPLACE_ME\",\"POLYMARKETDATA_API_KEY\":\"REPLACE_ME\"}"
+     "SecretStringTemplate": "{\"ANTHROPIC_API_KEY\":\"REPLACE_ME\",\"POLYMARKETDATA_API_KEY\":\"REPLACE_ME\",\"TELEGRAM_BOT_TOKEN\":\"REPLACE_ME\",\"TELEGRAM_CHAT_ID\":\"REPLACE_ME\"}"
     }
    },
    "UpdateReplacePolicy": "Delete",
    "DeletionPolicy": "Delete",
    "Metadata": {
     "aws:cdk:path": "PolyautomateStack/ResearcherCredentialsSecret/Resource"
+   }
+  },
+  "ExecutorErrorTopicBCF5983F": {
+   "Type": "AWS::SNS::Topic",
+   "Properties": {
+    "DisplayName": "polyautomate-executor-errors"
+   },
+   "Metadata": {
+    "aws:cdk:path": "PolyautomateStack/ExecutorErrorTopic/Resource"
    }
   },
   "ExecutorActionMetricFilterA3C06F0A": {
@@ -334,6 +425,49 @@
    },
    "Metadata": {
     "aws:cdk:path": "PolyautomateStack/ExecutorActionAlarm/Resource"
+   }
+  },
+  "ExecutorErrorMetricFilter95B293AE": {
+   "Type": "AWS::Logs::MetricFilter",
+   "Properties": {
+    "FilterPattern": "executor_cycle_failed",
+    "LogGroupName": {
+     "Ref": "ExecutorLogGroup0225862E"
+    },
+    "MetricTransformations": [
+     {
+      "DefaultValue": 0,
+      "MetricName": "ExecutorErrors",
+      "MetricNamespace": "Polyautomate",
+      "MetricValue": "1"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "PolyautomateStack/ExecutorErrorMetricFilter/Resource"
+   }
+  },
+  "ExecutorErrorAlarm4965A02B": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Ref": "ExecutorErrorTopicBCF5983F"
+     }
+    ],
+    "AlarmDescription": "Triggers when executor logs an execution failure",
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "DatapointsToAlarm": 1,
+    "EvaluationPeriods": 1,
+    "MetricName": "ExecutorErrors",
+    "Namespace": "Polyautomate",
+    "Period": 300,
+    "Statistic": "Sum",
+    "Threshold": 1,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "PolyautomateStack/ExecutorErrorAlarm/Resource"
    }
   },
   "ExecutorSecurityGroup594EBFE6": {
@@ -659,6 +793,43 @@
        "Resource": {
         "Ref": "ResearcherCredentialsSecretE874DF3C"
        }
+      },
+      {
+       "Action": [
+        "s3:GetObject*",
+        "s3:GetBucket*",
+        "s3:List*",
+        "s3:DeleteObject*",
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging",
+        "s3:Abort*"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "ResearcherStateBucket1CAC0A5F",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "ResearcherStateBucket1CAC0A5F",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
       }
      ],
      "Version": "2012-10-17"
@@ -691,6 +862,20 @@
         "Value": {
          "Ref": "AWS::Region"
         }
+       },
+       {
+        "Name": "ENABLE_CLAUDE",
+        "Value": "1"
+       },
+       {
+        "Name": "STATE_BUCKET",
+        "Value": {
+         "Ref": "ResearcherStateBucket1CAC0A5F"
+        }
+       },
+       {
+        "Name": "STATE_KEY",
+        "Value": "researcher/state.json"
        }
       ],
       "Essential": true,
@@ -781,6 +966,34 @@
             "Ref": "ResearcherCredentialsSecretE874DF3C"
            },
            ":POLYMARKETDATA_API_KEY::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "TELEGRAM_BOT_TOKEN",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "ResearcherCredentialsSecretE874DF3C"
+           },
+           ":TELEGRAM_BOT_TOKEN::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "TELEGRAM_CHAT_ID",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "ResearcherCredentialsSecretE874DF3C"
+           },
+           ":TELEGRAM_CHAT_ID::"
           ]
          ]
         }
@@ -1154,10 +1367,182 @@
     "aws:cdk:path": "PolyautomateStack/AlarmResearcherRun/Resource"
    }
   },
+  "ErrorTriggerFunctionServiceRole4404104D": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "PolyautomateStack/ErrorTriggerFunction/ServiceRole/Resource"
+   }
+  },
+  "ErrorTriggerFunctionServiceRoleDefaultPolicyA1539C35": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "ecs:RunTask",
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "ResearcherTaskDefinition48AD3637"
+       }
+      },
+      {
+       "Action": "iam:PassRole",
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "ResearcherTaskDefinitionExecutionRole08A0112D",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::GetAtt": [
+          "ResearcherTaskRoleF6EA9443",
+          "Arn"
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "ErrorTriggerFunctionServiceRoleDefaultPolicyA1539C35",
+    "Roles": [
+     {
+      "Ref": "ErrorTriggerFunctionServiceRole4404104D"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "PolyautomateStack/ErrorTriggerFunction/ServiceRole/DefaultPolicy/Resource"
+   }
+  },
+  "ErrorTriggerFunction4C95B8AF": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "ZipFile": "import boto3, os\ndef handler(event, context):\n  ecs = boto3.client('ecs')\n  ecs.run_task(\n    cluster=os.environ['CLUSTER_ARN'],\n    taskDefinition=os.environ['TASK_DEFINITION_ARN'],\n    launchType='FARGATE',\n    count=1,\n    networkConfiguration={\n      'awsvpcConfiguration': {\n        'subnets': os.environ['SUBNETS'].split(','),\n        'securityGroups': os.environ['SECURITY_GROUPS'].split(','),\n        'assignPublicIp': 'ENABLED'\n      }\n    }\n  )\n  return {'ok': True}\n"
+    },
+    "Environment": {
+     "Variables": {
+      "CLUSTER_ARN": {
+       "Fn::GetAtt": [
+        "ResearcherClusterC3B3A763",
+        "Arn"
+       ]
+      },
+      "TASK_DEFINITION_ARN": {
+       "Ref": "ResearcherTaskDefinition48AD3637"
+      },
+      "SUBNETS": {
+       "Fn::Join": [
+        "",
+        [
+         {
+          "Ref": "PolyautomateVpcpublicSubnet1SubnetAB23BF2A"
+         },
+         ",",
+         {
+          "Ref": "PolyautomateVpcpublicSubnet2Subnet6CE87AE8"
+         }
+        ]
+       ]
+      },
+      "SECURITY_GROUPS": {
+       "Fn::GetAtt": [
+        "ResearcherSecurityGroup0DB75941",
+        "GroupId"
+       ]
+      }
+     }
+    },
+    "Handler": "index.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "ErrorTriggerFunctionServiceRole4404104D",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Timeout": 60
+   },
+   "DependsOn": [
+    "ErrorTriggerFunctionServiceRoleDefaultPolicyA1539C35",
+    "ErrorTriggerFunctionServiceRole4404104D"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "PolyautomateStack/ErrorTriggerFunction/Resource"
+   }
+  },
+  "ErrorTriggerFunctionAllowInvokePolyautomateStackExecutorErrorTopicCD26E3A26AFB7B56": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "ErrorTriggerFunction4C95B8AF",
+      "Arn"
+     ]
+    },
+    "Principal": "sns.amazonaws.com",
+    "SourceArn": {
+     "Ref": "ExecutorErrorTopicBCF5983F"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PolyautomateStack/ErrorTriggerFunction/AllowInvoke:PolyautomateStackExecutorErrorTopicCD26E3A2"
+   }
+  },
+  "ErrorTriggerFunctionExecutorErrorTopic65A9734D": {
+   "Type": "AWS::SNS::Subscription",
+   "Properties": {
+    "Endpoint": {
+     "Fn::GetAtt": [
+      "ErrorTriggerFunction4C95B8AF",
+      "Arn"
+     ]
+    },
+    "Protocol": "lambda",
+    "TopicArn": {
+     "Ref": "ExecutorErrorTopicBCF5983F"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PolyautomateStack/ErrorTriggerFunction/ExecutorErrorTopic/Resource"
+   }
+  },
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/11Qy27CMBD8Fu7G5XHhiqhASFSNAuJaLe4CWxw7Wq+LkOV/rxICaXvamVnLMzsTPZ5N9WgA1zA0n5ehpYNOWwFzUXANHwnNRKd9bdTi6PbFQhXxYMls48GhNFqPSh8Fd3Cw2Ou9Ng/BGwIh756PG7B2guxQViB4hVtn07G5CJhzhU7UFk1kktuKfaxbgz/C2gUBZ7ove7yB6Mx5h1VtQTArNKxTibUPJJ5bu55lZf0p6LTxp6fNE7+hMJklWUFuFr95VgENo4QKHJyQddq2vMvJKFkZ6+PnFcScdZpb4KpZtiArgkqn0t+ba2fhLZk2Xo8edxXsj2TbY4JOCxtDF+kBl8AnaHoPl1c8kqNH6/8V7wTIIfdaVviNToJOZeziRIs5qxKDj3wvtQCGCjvT9yh1lKyKm5y9e5nqmR6PBl+BaMjRCVWoy/v8AYQe/O9rAgAA"
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/11Ry27jMAz8lt4V9ZFLr9kUKQp0sYYd9FrQCpOwkSVDpBoEgv594Vec9sSZkcAhh0/68XmpH+7gzAuzOy0s1TpVAuak4MyfCc2TTh+tUeu9+yjWqoi1JVPF2qF02oxKHwW3UFuc9VlbMXtDIOTd9XMH3pxgcCivIHiGy2gzspUImGODTlSFJgaSy2vwse0NfghvjgWcGVvO+B2iM8ctNq0FwazQBJ1KbD2T+NDbzSwr6w+s07s/XG2u+C9KILMhKxi6h1ueFS91+hPNaYhiREMpvCVzmeWBZ8VoAgo34OCAQaeq5+NqASUrdqzT1rfUpz+AKtZsArVTkLc8K2N93J1BzFGnlYXQdF96kBVBo1Pph/P0dZ5sRlN4RfB7sn1irNPaRh73nuAGwgG64/LpBffkaJrot+KdADkMs5YVfqMT1qmM4zixs7LQ1DvQaROdmbrd4gJDQ8xdh6xKZB/DcOUCAjQ4DvgvShslq+IiR+/ul/pZPz7cfTHRIkQn1KAuh/ofxtpzI/wCAAA="
    },
    "Metadata": {
     "aws:cdk:path": "PolyautomateStack/CDKMetadata/Default"
@@ -1290,6 +1675,21 @@
   "ActionAlarmName": {
    "Value": {
     "Ref": "ExecutorActionAlarmECAAD7F7"
+   }
+  },
+  "ErrorAlarmName": {
+   "Value": {
+    "Ref": "ExecutorErrorAlarm4965A02B"
+   }
+  },
+  "ExecutorErrorTopicArn": {
+   "Value": {
+    "Ref": "ExecutorErrorTopicBCF5983F"
+   }
+  },
+  "ResearcherStateBucketName": {
+   "Value": {
+    "Ref": "ResearcherStateBucket1CAC0A5F"
    }
   },
   "ExecutorCredentialsSecretArn": {

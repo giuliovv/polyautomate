@@ -4,14 +4,19 @@ from aws_cdk import (
     CfnOutput,
     Duration,
     aws_cloudwatch as cloudwatch,
+    aws_cloudwatch_actions as cloudwatch_actions,
     aws_ec2 as ec2,
     aws_ecr as ecr,
     aws_ecs as ecs,
     aws_events as events,
     aws_events_targets as targets,
     aws_iam as iam,
+    aws_lambda as _lambda,
     aws_logs as logs,
+    aws_s3 as s3,
     aws_secretsmanager as secretsmanager,
+    aws_sns as sns,
+    aws_sns_subscriptions as sns_subscriptions,
 )
 
 
@@ -67,6 +72,17 @@ class PolyautomateStack(cdk.Stack):
             removal_policy=cdk.RemovalPolicy.RETAIN,
         )
 
+        researcher_state_bucket = s3.Bucket(
+            self,
+            "ResearcherStateBucket",
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            enforce_ssl=True,
+            versioned=True,
+            lifecycle_rules=[s3.LifecycleRule(noncurrent_version_expiration=Duration.days(30))],
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+            auto_delete_objects=False,
+        )
+
         executor_credentials_secret = secretsmanager.Secret(
             self,
             "ExecutorCredentialsSecret",
@@ -82,9 +98,15 @@ class PolyautomateStack(cdk.Stack):
             "ResearcherCredentialsSecret",
             description="Researcher runtime credentials for Claude and PolymarketData",
             generate_secret_string=secretsmanager.SecretStringGenerator(
-                secret_string_template='{"ANTHROPIC_API_KEY":"REPLACE_ME","POLYMARKETDATA_API_KEY":"REPLACE_ME"}',
+                secret_string_template='{"ANTHROPIC_API_KEY":"REPLACE_ME","POLYMARKETDATA_API_KEY":"REPLACE_ME","TELEGRAM_BOT_TOKEN":"REPLACE_ME","TELEGRAM_CHAT_ID":"REPLACE_ME"}',
                 generate_string_key="bootstrap",
             ),
+        )
+
+        executor_error_topic = sns.Topic(
+            self,
+            "ExecutorErrorTopic",
+            display_name="polyautomate-executor-errors",
         )
 
         action_metric_filter = logs.MetricFilter(
@@ -108,6 +130,29 @@ class PolyautomateStack(cdk.Stack):
             alarm_description="Triggers researcher task after executor performs many actions",
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
         )
+
+        error_metric_filter = logs.MetricFilter(
+            self,
+            "ExecutorErrorMetricFilter",
+            log_group=executor_log_group,
+            metric_name="ExecutorErrors",
+            metric_namespace="Polyautomate",
+            filter_pattern=logs.FilterPattern.literal("executor_cycle_failed"),
+            metric_value="1",
+            default_value=0,
+        )
+
+        error_alarm = cloudwatch.Alarm(
+            self,
+            "ExecutorErrorAlarm",
+            metric=error_metric_filter.metric(statistic="Sum", period=Duration.minutes(5)),
+            threshold=1.0,
+            evaluation_periods=1,
+            datapoints_to_alarm=1,
+            alarm_description="Triggers when executor logs an execution failure",
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        error_alarm.add_alarm_action(cloudwatch_actions.SnsAction(executor_error_topic))
 
         executor_sg = ec2.SecurityGroup(
             self,
@@ -189,6 +234,7 @@ class PolyautomateStack(cdk.Stack):
         )
         executor_log_group.grant_read(researcher_task_role)
         researcher_credentials_secret.grant_read(researcher_task_role)
+        researcher_state_bucket.grant_read_write(researcher_task_role)
 
         researcher_task_definition = ecs.FargateTaskDefinition(
             self,
@@ -212,6 +258,9 @@ class PolyautomateStack(cdk.Stack):
             environment={
                 "EXECUTOR_LOG_GROUP": executor_log_group.log_group_name,
                 "AWS_REGION": cdk.Aws.REGION,
+                "ENABLE_CLAUDE": "1",
+                "STATE_BUCKET": researcher_state_bucket.bucket_name,
+                "STATE_KEY": "researcher/state.json",
             },
             secrets={
                 "ANTHROPIC_API_KEY": ecs.Secret.from_secrets_manager(
@@ -220,7 +269,21 @@ class PolyautomateStack(cdk.Stack):
                 "POLYMARKETDATA_API_KEY": ecs.Secret.from_secrets_manager(
                     researcher_credentials_secret, "POLYMARKETDATA_API_KEY"
                 ),
+                "TELEGRAM_BOT_TOKEN": ecs.Secret.from_secrets_manager(
+                    researcher_credentials_secret, "TELEGRAM_BOT_TOKEN"
+                ),
+                "TELEGRAM_CHAT_ID": ecs.Secret.from_secrets_manager(
+                    researcher_credentials_secret, "TELEGRAM_CHAT_ID"
+                ),
             },
+        )
+
+        researcher_security_group = ec2.SecurityGroup(
+            self,
+            "ResearcherSecurityGroup",
+            vpc=vpc,
+            allow_all_outbound=True,
+            description="Researcher task security group",
         )
 
         run_task_target = targets.EcsTask(
@@ -228,15 +291,7 @@ class PolyautomateStack(cdk.Stack):
             task_definition=researcher_task_definition,
             subnet_selection=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC),
             assign_public_ip=True,
-            security_groups=[
-                ec2.SecurityGroup(
-                    self,
-                    "ResearcherSecurityGroup",
-                    vpc=vpc,
-                    allow_all_outbound=True,
-                    description="Researcher task security group",
-                )
-            ],
+            security_groups=[researcher_security_group],
             task_count=1,
             platform_version=ecs.FargatePlatformVersion.LATEST,
         )
@@ -262,10 +317,64 @@ class PolyautomateStack(cdk.Stack):
             description="Run researcher task when executor action threshold is crossed",
         )
 
+        error_trigger_function = _lambda.Function(
+            self,
+            "ErrorTriggerFunction",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            handler="index.handler",
+            timeout=Duration.seconds(60),
+            code=_lambda.Code.from_inline(
+                "import boto3, os\n"
+                "def handler(event, context):\n"
+                "  ecs = boto3.client('ecs')\n"
+                "  ecs.run_task(\n"
+                "    cluster=os.environ['CLUSTER_ARN'],\n"
+                "    taskDefinition=os.environ['TASK_DEFINITION_ARN'],\n"
+                "    launchType='FARGATE',\n"
+                "    count=1,\n"
+                "    networkConfiguration={\n"
+                "      'awsvpcConfiguration': {\n"
+                "        'subnets': os.environ['SUBNETS'].split(','),\n"
+                "        'securityGroups': os.environ['SECURITY_GROUPS'].split(','),\n"
+                "        'assignPublicIp': 'ENABLED'\n"
+                "      }\n"
+                "    }\n"
+                "  )\n"
+                "  return {'ok': True}\n"
+            ),
+            environment={
+                "CLUSTER_ARN": cluster.cluster_arn,
+                "TASK_DEFINITION_ARN": researcher_task_definition.task_definition_arn,
+                "SUBNETS": ",".join([s.subnet_id for s in vpc.public_subnets]),
+                "SECURITY_GROUPS": researcher_security_group.security_group_id,
+            },
+        )
+        error_trigger_function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["ecs:RunTask"],
+                resources=[researcher_task_definition.task_definition_arn],
+            )
+        )
+        error_trigger_function.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["iam:PassRole"],
+                resources=[
+                    researcher_task_definition.execution_role.role_arn,
+                    researcher_task_definition.task_role.role_arn,
+                ],
+            )
+        )
+        executor_error_topic.add_subscription(
+            sns_subscriptions.LambdaSubscription(error_trigger_function)
+        )
+
         CfnOutput(self, "ExecutorEcrUri", value=executor_repo.repository_uri)
         CfnOutput(self, "ResearcherEcrUri", value=researcher_repo.repository_uri)
         CfnOutput(self, "ExecutorLogGroupName", value=executor_log_group.log_group_name)
         CfnOutput(self, "ResearcherLogGroupName", value=researcher_log_group.log_group_name)
         CfnOutput(self, "ActionAlarmName", value=action_alarm.alarm_name)
+        CfnOutput(self, "ErrorAlarmName", value=error_alarm.alarm_name)
+        CfnOutput(self, "ExecutorErrorTopicArn", value=executor_error_topic.topic_arn)
+        CfnOutput(self, "ResearcherStateBucketName", value=researcher_state_bucket.bucket_name)
         CfnOutput(self, "ExecutorCredentialsSecretArn", value=executor_credentials_secret.secret_arn)
         CfnOutput(self, "ResearcherCredentialsSecretArn", value=researcher_credentials_secret.secret_arn)
