@@ -183,7 +183,7 @@ class PolyautomateStack(cdk.Stack):
 
         executor_instance = ec2.Instance(
             self,
-            "ExecutorHostInstanceV2",
+            "ExecutorHostInstanceV3",
             vpc=vpc,
             instance_type=ec2.InstanceType(executor_instance_type),
             machine_image=ec2.MachineImage.latest_amazon_linux2023(
@@ -198,7 +198,7 @@ class PolyautomateStack(cdk.Stack):
         user_data = executor_instance.user_data
         user_data.add_commands(
             "dnf update -y",
-            "dnf install -y docker awscli cronie",
+            "dnf install -y docker awscli cronie git",
             "systemctl enable docker",
             "systemctl start docker",
             "systemctl enable crond",
