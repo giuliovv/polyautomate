@@ -43,6 +43,7 @@ from polyautomate.analytics import BacktestEngine, BacktestResult
 from polyautomate.analytics.strategies.whale_watcher import WhaleWatcherStrategy
 from polyautomate.analytics.strategies.rsi_mean_reversion import RSIMeanReversionStrategy
 from polyautomate.analytics.strategies.macd_momentum import MACDMomentumStrategy
+from polyautomate.analytics.strategies.longshot_bias import LongshotBiasStrategy
 
 
 def parse_args() -> argparse.Namespace:
@@ -167,6 +168,9 @@ def main() -> None:
             momentum_confirm=True,
             momentum_period=10,
         ),
+        # Longshot bias: sell overpriced longshots, buy underpriced favorites
+        LongshotBiasStrategy(longshot_threshold=0.35, favorite_threshold=0.65),
+        LongshotBiasStrategy(longshot_threshold=0.40, favorite_threshold=0.60),
         # RSI + trend filter: skip mean-reversion signals against the trend
         RSIMeanReversionStrategy(
             rsi_period=14,
@@ -216,6 +220,8 @@ def main() -> None:
         elif r.strategy_name == "MACDMomentum":
             tf = ",tf" if p.get("trend_filter") else ""
             label += f"(mom={p.get('momentum_confirm')}{tf})"
+        elif r.strategy_name == "LongshotBias":
+            label += f"(ls={p.get('longshot_threshold')},fav={p.get('favorite_threshold')})"
         print(
             f"  {label:<28}  {r.n_trades:>6}  {r.win_rate:>6.1%}  "
             f"{r.total_pnl:>+9.4f}  {r.avg_pnl:>+8.4f}  {r.sharpe_ratio:>7.3f}"
