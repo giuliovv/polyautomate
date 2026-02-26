@@ -263,6 +263,10 @@ def scan_market(
     The final few bars determine the resolution outcome; zone-entry signals
     are only scanned in the bars *before* those tail bars so we don't enter
     on the resolution spike itself.
+
+    Spread model: attempts to fetch per-bar spread from /metrics.  Each
+    trade uses the actual half-spread at its entry bar.  Falls back to the
+    ``half_spread`` parameter if metrics are unavailable.
     """
     try:
         data = client.get_prices(slug, bt_start.isoformat(), bt_end.isoformat(), resolution)
@@ -280,6 +284,20 @@ def scan_market(
 
     if len(prices) < _RES_LOOKBACK + 2:
         return []
+
+    # Fetch actual bid-ask spread from /metrics; build ts → half_spread lookup.
+    # Each metric bar's "spread" is the full bid-ask spread; we use half for
+    # the one-way execution cost (mid → bid for SELL, mid → ask for BUY).
+    spread_lookup: dict[int, float] = {}
+    try:
+        metrics = client.get_metrics(slug, bt_start.isoformat(), bt_end.isoformat(), resolution)
+        for m in metrics:
+            ts_m = _parse_ts(m.get("ts") or m.get("t", 0))
+            sprd = m.get("spread")
+            if sprd is not None:
+                spread_lookup[ts_m] = float(sprd) / 2.0
+    except PMDError:
+        pass  # fall back to fixed half_spread for all bars
 
     # Classify the resolution outcome from the tail
     resolution_outcome, resolution_price = _determine_resolution(prices)
@@ -304,16 +322,19 @@ def scan_market(
     for _idx, ts, zone, signal in entries:
         entry_price = analysis_prices[_idx]
 
+        # Actual half-spread at this bar, or fall back to the fixed assumption.
+        hs = spread_lookup.get(ts, half_spread)
+
         # Hold-to-resolution P&L.
         # Gross: computed at mid-price (no spread).
-        # Net: execution hits the bid (SELL) or ask (BUY), costing half_spread.
-        #   SELL at bid = mid - half_spread → pnl_net = pnl_gross - half_spread
-        #   BUY  at ask = mid + half_spread → pnl_net = pnl_gross - half_spread
+        # Net: execution hits the bid (SELL) or ask (BUY), costing hs.
+        #   SELL at bid = mid - hs → pnl_net = pnl_gross - hs
+        #   BUY  at ask = mid + hs → pnl_net = pnl_gross - hs
         if signal == "buy":
             pnl_gross = resolution_price - entry_price
         else:  # sell
             pnl_gross = -(resolution_price - entry_price)
-        pnl_net = pnl_gross - half_spread
+        pnl_net = pnl_gross - hs
 
         trades.append(LongshotTrade(
             slug=slug,
@@ -325,7 +346,7 @@ def scan_market(
             resolution=resolution_outcome,
             resolution_price=resolution_price,
             pnl_gross=pnl_gross,
-            half_spread=half_spread,
+            half_spread=hs,
             pnl=pnl_net,
         ))
 
@@ -413,12 +434,13 @@ def print_aggregate(trades: list[LongshotTrade]) -> None:
         print("  No trades generated.")
         return
 
-    wins        = sum(1 for t in trades if t.win)
-    total_gross = sum(t.pnl_gross for t in trades)
-    total_net   = sum(t.pnl for t in trades)
-    avg_net     = total_net / len(trades)
-    sharpe      = _sharpe([t.pnl for t in trades])
-    hs          = trades[0].half_spread   # same for all trades in one run
+    wins         = sum(1 for t in trades if t.win)
+    total_gross  = sum(t.pnl_gross for t in trades)
+    total_net    = sum(t.pnl for t in trades)
+    total_spread = sum(t.half_spread for t in trades)
+    avg_hs       = total_spread / len(trades)
+    avg_net      = total_net / len(trades)
+    sharpe       = _sharpe([t.pnl for t in trades])
 
     print(f"\n{'='*76}")
     print("Aggregate Results  (hold-to-resolution exits)")
@@ -426,7 +448,7 @@ def print_aggregate(trades: list[LongshotTrade]) -> None:
     print(f"  Total trades       : {len(trades)}")
     print(f"  Win rate           : {wins/len(trades):.1%}  ({wins}/{len(trades)})")
     print(f"  Gross P&L (mid)    : {total_gross:+.4f} probability pts")
-    print(f"  Spread cost        : {-hs * len(trades):+.4f}  ({hs:.3f} half-spread × {len(trades)} trades)")
+    print(f"  Spread cost        : {-total_spread:+.4f}  (avg {avg_hs:.3f} half-spread × {len(trades)} trades)")
     print(f"  Net P&L            : {total_net:+.4f} probability pts")
     print(f"  Avg net P&L/trade  : {avg_net:+.4f}")
     print(f"  Sharpe ratio       : {sharpe:.3f}  (on net P&L)")
@@ -447,7 +469,7 @@ def print_aggregate(trades: list[LongshotTrade]) -> None:
         )
 
 
-def print_kelly(trades: list[LongshotTrade]) -> None:
+def print_kelly(trades: list[LongshotTrade], longshot_threshold: float = 0.40) -> None:
     """
     Print Kelly-optimal position sizing recommendations.
 
@@ -458,7 +480,7 @@ def print_kelly(trades: list[LongshotTrade]) -> None:
     Kelly fraction of bankroll to commit as collateral per trade:
       f* = (p·b − q·(1−b)) / (b·(1−b))
 
-    where p = empirical win rate, q = 1 − p.
+    where p = empirical win rate, q = 1 − p, b = actual bid at entry.
 
     The ¼-Kelly column is the practical recommendation: it reduces variance
     by 75% while giving up only a modest fraction of expected growth.
@@ -467,37 +489,46 @@ def print_kelly(trades: list[LongshotTrade]) -> None:
     if not sell_trades:
         return
 
-    n_total = len(sell_trades)
-    n_win   = sum(1 for t in sell_trades if t.win)
-    p_win   = n_win / n_total
-    q_lose  = 1.0 - p_win
-    hs      = sell_trades[0].half_spread
+    n_total  = len(sell_trades)
+    n_win    = sum(1 for t in sell_trades if t.win)
+    p_win    = n_win / n_total
+    q_lose   = 1.0 - p_win
+    avg_hs   = sum(t.half_spread for t in sell_trades) / n_total
+    using_real = any(t.half_spread != sell_trades[0].half_spread for t in sell_trades)
+    spread_src = "actual from /metrics" if using_real else f"fixed {avg_hs:.3f}"
 
     print(f"\n{'='*76}")
     print("Kelly Position Sizing  (Longshot SELL signals)")
     print(f"{'='*76}")
     print(f"  Empirical win rate : {p_win:.1%}  ({n_win}/{n_total} trades)")
-    print(f"  Assumed half-spread: {hs:.3f}  (bid = mid − {hs:.3f})")
+    print(f"  Half-spread source : {spread_src}  (avg {avg_hs:.3f})")
     print(f"  Formula            : f* = (p·b − q·(1−b)) / (b·(1−b))")
-    print(f"                       b  = entry_price − half_spread")
+    print(f"                       b  = entry_price − half_spread (actual)")
     print()
     print(
         f"  {'Bucket':>10}  {'N':>4}  {'Win%':>6}  "
-        f"{'Bid (b)':>7}  {'Full Kelly':>10}  {'¼ Kelly':>8}  Note"
+        f"{'Avg bid':>7}  {'Full Kelly':>10}  {'¼ Kelly':>8}  Note"
     )
     print("  " + "-" * 68)
 
-    # Per bucket Kelly using bucket-specific win rate where N is sufficient,
-    # else fall back to the overall empirical win rate.
+    # Build Kelly buckets aligned to _CALIBRATION_BUCKETS but capped at the
+    # actual longshot_threshold so no trades fall through the cracks.
+    # e.g. with threshold=0.40 the (0.35, 0.50) calibration bucket is split
+    # into (0.35, 0.40) and the rest is ignored.
     for lo, hi, _ in _CALIBRATION_BUCKETS:
-        if hi > 0.40:
-            continue   # only show longshot buckets
-        bucket = [t for t in sell_trades if lo <= t.entry_price < hi]
+        # Skip buckets entirely above the longshot threshold
+        if lo >= longshot_threshold:
+            continue
+        # Cap the upper bound at the threshold (handles the partial bucket)
+        hi_eff = min(hi, longshot_threshold)
+
+        bucket = [t for t in sell_trades if lo <= t.entry_price < hi_eff]
         if not bucket:
             continue
 
-        b_mid = (lo + hi) / 2.0 - hs     # representative bid for this bucket
-        if b_mid <= 0:
+        # Use per-trade actual bid for the Kelly formula
+        avg_bid = sum(t.entry_price - t.half_spread for t in bucket) / len(bucket)
+        if avg_bid <= 0:
             continue
 
         # Use bucket win rate if N ≥ 10, else overall
@@ -510,25 +541,26 @@ def print_kelly(trades: list[LongshotTrade]) -> None:
             q = q_lose
             src = "overall"
 
-        denom = b_mid * (1 - b_mid)
-        kelly = (p * b_mid - q * (1 - b_mid)) / denom if denom > 0 else 0.0
-        kelly = max(0.0, kelly)   # never negative (don't bet against the signal)
+        denom = avg_bid * (1 - avg_bid)
+        kelly = (p * avg_bid - q * (1 - avg_bid)) / denom if denom > 0 else 0.0
+        kelly = max(0.0, kelly)
         quarter_kelly = kelly / 4.0
 
-        note = f"({src} p={p:.0%})"
+        label = f"{lo:.2f}–{hi_eff:.2f}"
+        note  = f"({src} p={p:.0%})"
         print(
-            f"  {lo:.2f}–{hi:.2f}     {len(bucket):>4}  {p:.0%}     "
-            f"{b_mid:>7.3f}  {kelly:>10.1%}  {quarter_kelly:>8.1%}  {note}"
+            f"  {label:>10}  {len(bucket):>4}  {p:.0%}     "
+            f"{avg_bid:>7.3f}  {kelly:>10.1%}  {quarter_kelly:>8.1%}  {note}"
         )
 
-    # Overall Kelly at average entry price
+    # Overall Kelly using per-trade actual bid
     avg_entry = sum(t.entry_price for t in sell_trades) / n_total
-    b_avg     = avg_entry - hs
-    if b_avg > 0:
-        denom = b_avg * (1 - b_avg)
-        k_all = max(0.0, (p_win * b_avg - q_lose * (1 - b_avg)) / denom)
+    avg_bid_all = sum(t.entry_price - t.half_spread for t in sell_trades) / n_total
+    if avg_bid_all > 0:
+        denom = avg_bid_all * (1 - avg_bid_all)
+        k_all = max(0.0, (p_win * avg_bid_all - q_lose * (1 - avg_bid_all)) / denom)
         print()
-        print(f"  Overall (avg entry={avg_entry:.3f}, bid={b_avg:.3f})")
+        print(f"  Overall (avg entry={avg_entry:.3f}, avg bid={avg_bid_all:.3f})")
         print(f"    Full Kelly : {k_all:.1%} of bankroll per trade")
         print(f"    ¼ Kelly    : {k_all/4:.1%} of bankroll per trade  ← recommended")
         print()
@@ -716,7 +748,7 @@ def main() -> None:
     # ── Step 3: results ──────────────────────────────────────────────────────
     print_aggregate(all_trades)
     print_calibration(all_trades)
-    print_kelly(all_trades)
+    print_kelly(all_trades, longshot_threshold=args.longshot)
     print_top_trades(all_trades)
 
     # ── Step 4: optional CSV export ──────────────────────────────────────────
