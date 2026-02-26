@@ -86,7 +86,9 @@ class LongshotTrade:
     entry_ts:         int    # Unix timestamp
     resolution:       str    # "YES" | "NO"
     resolution_price: float  # final bar mid-price (~0.0 or ~1.0)
-    pnl:              float  # hold-to-resolution P&L
+    pnl_gross:        float  # hold-to-resolution P&L at mid-price (no spread)
+    half_spread:      float  # assumed half bid-ask spread subtracted from P&L
+    pnl:              float  # net P&L after spread cost (= pnl_gross - half_spread)
 
     @property
     def win(self) -> bool:
@@ -253,6 +255,7 @@ def scan_market(
     min_price: float = 0.02,
     max_price: float = 0.98,
     first_entry_only: bool = False,
+    half_spread: float = 0.01,
 ) -> list[LongshotTrade]:
     """
     Fetch price data for one resolved market and return zone-entry trades.
@@ -301,11 +304,16 @@ def scan_market(
     for _idx, ts, zone, signal in entries:
         entry_price = analysis_prices[_idx]
 
-        # Hold-to-resolution P&L (no spread model — uses mid-price only)
+        # Hold-to-resolution P&L.
+        # Gross: computed at mid-price (no spread).
+        # Net: execution hits the bid (SELL) or ask (BUY), costing half_spread.
+        #   SELL at bid = mid - half_spread → pnl_net = pnl_gross - half_spread
+        #   BUY  at ask = mid + half_spread → pnl_net = pnl_gross - half_spread
         if signal == "buy":
-            pnl = resolution_price - entry_price
+            pnl_gross = resolution_price - entry_price
         else:  # sell
-            pnl = -(resolution_price - entry_price)
+            pnl_gross = -(resolution_price - entry_price)
+        pnl_net = pnl_gross - half_spread
 
         trades.append(LongshotTrade(
             slug=slug,
@@ -316,7 +324,9 @@ def scan_market(
             entry_ts=ts,
             resolution=resolution_outcome,
             resolution_price=resolution_price,
-            pnl=pnl,
+            pnl_gross=pnl_gross,
+            half_spread=half_spread,
+            pnl=pnl_net,
         ))
 
     return trades
@@ -403,19 +413,23 @@ def print_aggregate(trades: list[LongshotTrade]) -> None:
         print("  No trades generated.")
         return
 
-    wins      = sum(1 for t in trades if t.win)
-    total_pnl = sum(t.pnl for t in trades)
-    avg_pnl   = total_pnl / len(trades)
-    sharpe    = _sharpe([t.pnl for t in trades])
+    wins        = sum(1 for t in trades if t.win)
+    total_gross = sum(t.pnl_gross for t in trades)
+    total_net   = sum(t.pnl for t in trades)
+    avg_net     = total_net / len(trades)
+    sharpe      = _sharpe([t.pnl for t in trades])
+    hs          = trades[0].half_spread   # same for all trades in one run
 
     print(f"\n{'='*76}")
     print("Aggregate Results  (hold-to-resolution exits)")
     print(f"{'='*76}")
     print(f"  Total trades       : {len(trades)}")
     print(f"  Win rate           : {wins/len(trades):.1%}  ({wins}/{len(trades)})")
-    print(f"  Total P&L          : {total_pnl:+.4f} probability pts")
-    print(f"  Avg P&L per trade  : {avg_pnl:+.4f}")
-    print(f"  Sharpe ratio       : {sharpe:.3f}")
+    print(f"  Gross P&L (mid)    : {total_gross:+.4f} probability pts")
+    print(f"  Spread cost        : {-hs * len(trades):+.4f}  ({hs:.3f} half-spread × {len(trades)} trades)")
+    print(f"  Net P&L            : {total_net:+.4f} probability pts")
+    print(f"  Avg net P&L/trade  : {avg_net:+.4f}")
+    print(f"  Sharpe ratio       : {sharpe:.3f}  (on net P&L)")
 
     # Breakdown by zone
     for label, subset in [
@@ -428,9 +442,101 @@ def print_aggregate(trades: list[LongshotTrade]) -> None:
         p = sum(t.pnl for t in subset)
         print(
             f"  {label:<20}: {len(subset):>4} trades  "
-            f"win={w/len(subset):.1%}  pnl={p:+.4f}  "
+            f"win={w/len(subset):.1%}  net_pnl={p:+.4f}  "
             f"sharpe={_sharpe([t.pnl for t in subset]):.3f}"
         )
+
+
+def print_kelly(trades: list[LongshotTrade]) -> None:
+    """
+    Print Kelly-optimal position sizing recommendations.
+
+    For a SELL at execution bid b = entry_price - half_spread:
+      Win (NO resolution):  gain = b
+      Loss (YES resolution): loss = 1 - b
+
+    Kelly fraction of bankroll to commit as collateral per trade:
+      f* = (p·b − q·(1−b)) / (b·(1−b))
+
+    where p = empirical win rate, q = 1 − p.
+
+    The ¼-Kelly column is the practical recommendation: it reduces variance
+    by 75% while giving up only a modest fraction of expected growth.
+    """
+    sell_trades = [t for t in trades if t.zone == "longshot"]
+    if not sell_trades:
+        return
+
+    n_total = len(sell_trades)
+    n_win   = sum(1 for t in sell_trades if t.win)
+    p_win   = n_win / n_total
+    q_lose  = 1.0 - p_win
+    hs      = sell_trades[0].half_spread
+
+    print(f"\n{'='*76}")
+    print("Kelly Position Sizing  (Longshot SELL signals)")
+    print(f"{'='*76}")
+    print(f"  Empirical win rate : {p_win:.1%}  ({n_win}/{n_total} trades)")
+    print(f"  Assumed half-spread: {hs:.3f}  (bid = mid − {hs:.3f})")
+    print(f"  Formula            : f* = (p·b − q·(1−b)) / (b·(1−b))")
+    print(f"                       b  = entry_price − half_spread")
+    print()
+    print(
+        f"  {'Bucket':>10}  {'N':>4}  {'Win%':>6}  "
+        f"{'Bid (b)':>7}  {'Full Kelly':>10}  {'¼ Kelly':>8}  Note"
+    )
+    print("  " + "-" * 68)
+
+    # Per bucket Kelly using bucket-specific win rate where N is sufficient,
+    # else fall back to the overall empirical win rate.
+    for lo, hi, _ in _CALIBRATION_BUCKETS:
+        if hi > 0.40:
+            continue   # only show longshot buckets
+        bucket = [t for t in sell_trades if lo <= t.entry_price < hi]
+        if not bucket:
+            continue
+
+        b_mid = (lo + hi) / 2.0 - hs     # representative bid for this bucket
+        if b_mid <= 0:
+            continue
+
+        # Use bucket win rate if N ≥ 10, else overall
+        if len(bucket) >= 10:
+            p = sum(1 for t in bucket if t.win) / len(bucket)
+            q = 1 - p
+            src = "bucket"
+        else:
+            p = p_win
+            q = q_lose
+            src = "overall"
+
+        denom = b_mid * (1 - b_mid)
+        kelly = (p * b_mid - q * (1 - b_mid)) / denom if denom > 0 else 0.0
+        kelly = max(0.0, kelly)   # never negative (don't bet against the signal)
+        quarter_kelly = kelly / 4.0
+
+        note = f"({src} p={p:.0%})"
+        print(
+            f"  {lo:.2f}–{hi:.2f}     {len(bucket):>4}  {p:.0%}     "
+            f"{b_mid:>7.3f}  {kelly:>10.1%}  {quarter_kelly:>8.1%}  {note}"
+        )
+
+    # Overall Kelly at average entry price
+    avg_entry = sum(t.entry_price for t in sell_trades) / n_total
+    b_avg     = avg_entry - hs
+    if b_avg > 0:
+        denom = b_avg * (1 - b_avg)
+        k_all = max(0.0, (p_win * b_avg - q_lose * (1 - b_avg)) / denom)
+        print()
+        print(f"  Overall (avg entry={avg_entry:.3f}, bid={b_avg:.3f})")
+        print(f"    Full Kelly : {k_all:.1%} of bankroll per trade")
+        print(f"    ¼ Kelly    : {k_all/4:.1%} of bankroll per trade  ← recommended")
+        print()
+        print("  Interpretation:")
+        print("    Full Kelly maximises long-run growth but has extreme swings.")
+        print("    ¼ Kelly is the practical standard: ~56% of full Kelly growth,")
+        print("    ~75% reduction in variance.  Cap individual trades at 5% of")
+        print("    bankroll regardless of formula output (single-event tail risk).")
 
 
 def print_top_trades(trades: list[LongshotTrade], n: int = 15) -> None:
@@ -484,6 +590,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--no-sports", action="store_true",
                    help="Skip live-game markets (esports, football, basketball match winners) "
                         "where intra-game price swings generate misleading zone entries")
+    p.add_argument("--half-spread", type=float, default=0.01,
+                   help="Half bid-ask spread subtracted from each trade's P&L to model "
+                        "execution cost (default: 0.01 = 1 pp). SELL signals execute at "
+                        "bid = mid − half_spread.")
     p.add_argument("--verbose",  action="store_true",
                    help="Print per-market progress")
     p.add_argument("--csv",      default=None,
@@ -510,6 +620,7 @@ def main() -> None:
     signal_mode = "SELL only" if args.sell_only else "SELL + BUY"
     print(f"Entry mode       : {entry_mode}  |  signals: {signal_mode}")
     print(f"Sports filter    : {'on (skip live-game markets)' if args.no_sports else 'off'}")
+    print(f"Half-spread      : {args.half_spread:.3f}  (execution cost per trade)")
     print()
 
     # ── Step 1: fetch resolved market list ──────────────────────────────────
@@ -560,6 +671,7 @@ def main() -> None:
                 longshot_threshold=args.longshot,
                 favorite_threshold=args.favorite,
                 first_entry_only=args.first_entry_only,
+                half_spread=args.half_spread,
             )
         except PMDError as e:
             if e.status_code == 403:
@@ -604,6 +716,7 @@ def main() -> None:
     # ── Step 3: results ──────────────────────────────────────────────────────
     print_aggregate(all_trades)
     print_calibration(all_trades)
+    print_kelly(all_trades)
     print_top_trades(all_trades)
 
     # ── Step 4: optional CSV export ──────────────────────────────────────────
@@ -612,15 +725,17 @@ def main() -> None:
             w = csv.writer(f)
             w.writerow([
                 "slug", "question", "signal", "zone",
-                "entry_price", "resolution", "resolution_price",
-                "pnl", "win",
+                "entry_price", "half_spread", "resolution", "resolution_price",
+                "pnl_gross", "pnl_net", "win",
             ])
             for t in all_trades:
                 w.writerow([
                     t.slug, t.question, t.signal, t.zone,
                     f"{t.entry_price:.4f}",
+                    f"{t.half_spread:.4f}",
                     t.resolution,
                     f"{t.resolution_price:.4f}",
+                    f"{t.pnl_gross:.6f}",
                     f"{t.pnl:.6f}",
                     int(t.win),
                 ])
