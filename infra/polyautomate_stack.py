@@ -26,6 +26,11 @@ class PolyautomateStack(cdk.Stack):
 
         action_threshold = self.node.try_get_context("actionThreshold") or 200
         daily_schedule = self.node.try_get_context("dailySchedule") or "cron(0 3 * * ? *)"
+        executor_repo_url = (
+            self.node.try_get_context("executorRepoUrl")
+            or "https://github.com/giuliovv/polyautomate.git"
+        )
+        executor_repo_branch = self.node.try_get_context("executorRepoBranch") or "main"
         executor_instance_type = (
             self.node.try_get_context("executorInstanceType") or "t3.micro"
         )
@@ -88,7 +93,7 @@ class PolyautomateStack(cdk.Stack):
             "ExecutorCredentialsSecret",
             description="Executor runtime credentials for Polymarket trading",
             generate_secret_string=secretsmanager.SecretStringGenerator(
-                secret_string_template='{"POLYMARKET_API_KEY":"REPLACE_ME","POLYMARKET_PASSPHRASE":"REPLACE_ME","POLYMARKET_SIGNING_KEY":"REPLACE_ME"}',
+                secret_string_template='{"POLYMARKET_API_KEY":"REPLACE_ME","POLYMARKET_PASSPHRASE":"REPLACE_ME","POLYMARKET_SIGNING_KEY":"REPLACE_ME","POLYMARKETDATA_API_KEY":"REPLACE_ME","EXECUTOR_GITHUB_TOKEN":"REPLACE_ME"}',
                 generate_string_key="bootstrap",
             ),
         )
@@ -98,7 +103,7 @@ class PolyautomateStack(cdk.Stack):
             "ResearcherCredentialsSecret",
             description="Researcher runtime credentials for Claude and PolymarketData",
             generate_secret_string=secretsmanager.SecretStringGenerator(
-                secret_string_template='{"ANTHROPIC_API_KEY":"REPLACE_ME","POLYMARKETDATA_API_KEY":"REPLACE_ME","TELEGRAM_BOT_TOKEN":"REPLACE_ME","TELEGRAM_CHAT_ID":"REPLACE_ME"}',
+                secret_string_template='{"ANTHROPIC_API_KEY":"REPLACE_ME","POLYMARKETDATA_API_KEY":"REPLACE_ME","TELEGRAM_BOT_TOKEN":"REPLACE_ME","TELEGRAM_CHAT_ID":"REPLACE_ME","GITHUB_TOKEN":"REPLACE_ME"}',
                 generate_string_key="bootstrap",
             ),
         )
@@ -168,11 +173,6 @@ class PolyautomateStack(cdk.Stack):
             assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
         )
         executor_role.add_managed_policy(
-            iam.ManagedPolicy.from_aws_managed_policy_name(
-                "AmazonEC2ContainerRegistryReadOnly"
-            )
-        )
-        executor_role.add_managed_policy(
             iam.ManagedPolicy.from_aws_managed_policy_name("CloudWatchAgentServerPolicy")
         )
         executor_role.add_managed_policy(
@@ -198,31 +198,105 @@ class PolyautomateStack(cdk.Stack):
         user_data = executor_instance.user_data
         user_data.add_commands(
             "dnf update -y",
-            "dnf install -y docker awscli",
+            "dnf install -y docker awscli cronie",
             "systemctl enable docker",
             "systemctl start docker",
+            "systemctl enable crond",
+            "systemctl start crond",
             f"REGION={cdk.Aws.REGION}",
-            f"ACCOUNT_ID={cdk.Aws.ACCOUNT_ID}",
-            f"IMAGE_URI={executor_repo.repository_uri}:latest",
-            "aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com",
-            "docker pull $IMAGE_URI",
-            "docker rm -f polyautomate-executor || true",
-            f"SECRET_JSON=$(aws secretsmanager get-secret-value --region $REGION --secret-id {executor_credentials_secret.secret_arn} --query SecretString --output text)",
-            "POLYMARKET_API_KEY=$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_API_KEY\", \"\"))')",
-            "POLYMARKET_PASSPHRASE=$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_PASSPHRASE\", \"\"))')",
-            "POLYMARKET_SIGNING_KEY=$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_SIGNING_KEY\", \"\"))')",
-            (
-                "docker run -d --name polyautomate-executor --restart unless-stopped "
-                "-e EXECUTOR_MODE=live "
-                "-e POLYMARKET_API_KEY=\"$POLYMARKET_API_KEY\" "
-                "-e POLYMARKET_PASSPHRASE=\"$POLYMARKET_PASSPHRASE\" "
-                "-e POLYMARKET_SIGNING_KEY=\"$POLYMARKET_SIGNING_KEY\" "
-                "--log-driver=awslogs "
-                "--log-opt awslogs-region=$REGION "
-                f"--log-opt awslogs-group={executor_log_group.log_group_name} "
-                "--log-opt awslogs-stream=executor-ec2 "
-                "$IMAGE_URI"
-            ),
+            """cat > /usr/local/bin/reconcile-executor.sh <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+REGION="${REGION:-eu-west-1}"
+SECRET_ARN="${SECRET_ARN:-}"
+REPO_URL="${REPO_URL:-}"
+REPO_BRANCH="${REPO_BRANCH:-main}"
+REPO_DIR="${REPO_DIR:-/opt/polyautomate-src}"
+STATE_DIR="/var/lib/polyautomate"
+LOG_GROUP="${LOG_GROUP:-/polyautomate/executor}"
+POLL_SECONDS="${POLL_SECONDS:-30}"
+STRATEGY_RUNNER="${STRATEGY_RUNNER:-polyautomate.runtime.example_strategy:run_once}"
+GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+
+if [[ -z "$SECRET_ARN" || -z "$REPO_URL" ]]; then
+  echo "missing_required_env"
+  exit 1
+fi
+
+SECRET_JSON="$(aws secretsmanager get-secret-value --region "$REGION" --secret-id "$SECRET_ARN" --query SecretString --output text)"
+POLYMARKET_API_KEY="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_API_KEY", ""))')"
+POLYMARKET_PASSPHRASE="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_PASSPHRASE", ""))')"
+POLYMARKET_SIGNING_KEY="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_SIGNING_KEY", ""))')"
+POLYMARKETDATA_API_KEY="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKETDATA_API_KEY", ""))')"
+GITHUB_TOKEN="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("EXECUTOR_GITHUB_TOKEN", ""))')"
+if [[ "$GITHUB_TOKEN" == "REPLACE_ME" || "$GITHUB_TOKEN" == "null" ]]; then
+  GITHUB_TOKEN=""
+fi
+
+mkdir -p "$STATE_DIR"
+
+AUTH_REPO_URL="$REPO_URL"
+if [[ -n "$GITHUB_TOKEN" && "$REPO_URL" == https://github.com/* ]]; then
+  AUTH_REPO_URL="${REPO_URL/https:\/\/github.com\//https:\/\/x-access-token:${GITHUB_TOKEN}@github.com\/}"
+fi
+
+if [[ ! -d "$REPO_DIR/.git" ]]; then
+  rm -rf "$REPO_DIR"
+  git clone --depth 1 --branch "$REPO_BRANCH" "$AUTH_REPO_URL" "$REPO_DIR"
+else
+  git -C "$REPO_DIR" remote set-url origin "$AUTH_REPO_URL"
+  git -C "$REPO_DIR" fetch origin "$REPO_BRANCH"
+  git -C "$REPO_DIR" checkout "$REPO_BRANCH"
+  git -C "$REPO_DIR" reset --hard "origin/$REPO_BRANCH"
+  git -C "$REPO_DIR" clean -fd
+fi
+
+NEW_SHA="$(git -C "$REPO_DIR" rev-parse HEAD)"
+SECRET_SIG="$(printf '%s' "$POLYMARKET_API_KEY:$POLYMARKET_PASSPHRASE:$POLYMARKET_SIGNING_KEY:$POLL_SECONDS:$STRATEGY_RUNNER" | sha256sum | awk '{print $1}')"
+DESIRED_SIG="$NEW_SHA:$SECRET_SIG"
+CURRENT_SIG="$(cat "$STATE_DIR/deploy.sig" 2>/dev/null || true)"
+
+if [[ "$DESIRED_SIG" != "$CURRENT_SIG" ]]; then
+  docker build -f "$REPO_DIR/docker/executor/Dockerfile" -t "polyautomate-executor:$NEW_SHA" "$REPO_DIR" >/dev/null
+  docker rm -f polyautomate-executor >/dev/null 2>&1 || true
+  docker run -d --name polyautomate-executor --restart unless-stopped \
+    -e EXECUTOR_MODE=live \
+    -e POLL_SECONDS="$POLL_SECONDS" \
+    -e STRATEGY_RUNNER="$STRATEGY_RUNNER" \
+    -e DRY_RUN="$DRY_RUN" \
+    -e POLYMARKET_API_KEY="$POLYMARKET_API_KEY" \
+    -e POLYMARKET_PASSPHRASE="$POLYMARKET_PASSPHRASE" \
+    -e POLYMARKET_SIGNING_KEY="$POLYMARKET_SIGNING_KEY" \
+    -e POLYMARKETDATA_API_KEY="$POLYMARKETDATA_API_KEY" \
+    -e LONGSHOT_THRESHOLD="$LONGSHOT_THRESHOLD" \
+    -e LONGSHOT_MIN_DAYS_LEFT="$LONGSHOT_MIN_DAYS_LEFT" \
+    -e LONGSHOT_ORDER_SIZE="$LONGSHOT_ORDER_SIZE" \
+    -e LONGSHOT_MAX_ACTIONS_PER_CYCLE="$LONGSHOT_MAX_ACTIONS_PER_CYCLE" \
+    --log-driver=awslogs \
+    --log-opt awslogs-region="$REGION" \
+    --log-opt awslogs-group="$LOG_GROUP" \
+    --log-opt awslogs-stream=executor-ec2 \
+    "polyautomate-executor:$NEW_SHA" >/dev/null
+  echo "$DESIRED_SIG" > "$STATE_DIR/deploy.sig"
+fi
+SCRIPT""",
+            "chmod +x /usr/local/bin/reconcile-executor.sh",
+            f"echo 'REGION={cdk.Aws.REGION}' > /etc/polyautomate-executor.env",
+            f"echo 'SECRET_ARN={executor_credentials_secret.secret_arn}' >> /etc/polyautomate-executor.env",
+            f"echo 'REPO_URL={executor_repo_url}' >> /etc/polyautomate-executor.env",
+            f"echo 'REPO_BRANCH={executor_repo_branch}' >> /etc/polyautomate-executor.env",
+            f"echo 'LOG_GROUP={executor_log_group.log_group_name}' >> /etc/polyautomate-executor.env",
+            "echo 'POLL_SECONDS=30' >> /etc/polyautomate-executor.env",
+            "echo 'DRY_RUN=0' >> /etc/polyautomate-executor.env",
+            "echo 'STRATEGY_RUNNER=polyautomate.runtime.longshot_executor:run_once' >> /etc/polyautomate-executor.env",
+            "echo 'LONGSHOT_THRESHOLD=0.40' >> /etc/polyautomate-executor.env",
+            "echo 'LONGSHOT_MIN_DAYS_LEFT=2' >> /etc/polyautomate-executor.env",
+            "echo 'LONGSHOT_ORDER_SIZE=5' >> /etc/polyautomate-executor.env",
+            "echo 'LONGSHOT_MAX_ACTIONS_PER_CYCLE=1' >> /etc/polyautomate-executor.env",
+            "bash -lc 'set -a; source /etc/polyautomate-executor.env; set +a; /usr/local/bin/reconcile-executor.sh'",
+            "echo '*/10 * * * * root bash -lc \"set -a; source /etc/polyautomate-executor.env; set +a; /usr/local/bin/reconcile-executor.sh\"' > /etc/cron.d/polyautomate-reconcile",
+            "chmod 644 /etc/cron.d/polyautomate-reconcile",
+            "systemctl restart crond",
         )
 
         cluster = ecs.Cluster(self, "ResearcherCluster", vpc=vpc)
@@ -259,8 +333,11 @@ class PolyautomateStack(cdk.Stack):
                 "EXECUTOR_LOG_GROUP": executor_log_group.log_group_name,
                 "AWS_REGION": cdk.Aws.REGION,
                 "ENABLE_CLAUDE": "1",
+                "ENABLE_PR_AUTOMATION": "1",
                 "STATE_BUCKET": researcher_state_bucket.bucket_name,
                 "STATE_KEY": "researcher/state.json",
+                "GITHUB_REPO": "giuliovv/polyautomate",
+                "GITHUB_BASE_BRANCH": "main",
             },
             secrets={
                 "ANTHROPIC_API_KEY": ecs.Secret.from_secrets_manager(
@@ -274,6 +351,9 @@ class PolyautomateStack(cdk.Stack):
                 ),
                 "TELEGRAM_CHAT_ID": ecs.Secret.from_secrets_manager(
                     researcher_credentials_secret, "TELEGRAM_CHAT_ID"
+                ),
+                "GITHUB_TOKEN": ecs.Secret.from_secrets_manager(
+                    researcher_credentials_secret, "GITHUB_TOKEN"
                 ),
             },
         )
