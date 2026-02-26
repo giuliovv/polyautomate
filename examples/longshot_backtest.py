@@ -97,6 +97,31 @@ class LongshotTrade:
 # Helpers
 # ---------------------------------------------------------------------------
 
+# Keywords that identify live-game / match-outcome markets where intra-game
+# price swings create spurious zone entries unrelated to the longshot bias.
+_SPORTS_KEYWORDS = (
+    "map 1", "map 2", "map 3",          # esports map winners
+    "game 1", "game 2", "game 3",        # esports game winners
+    "first blood",                        # live esports props
+    "total kills",                        # live esports over/under
+    "game handicap", "map handicap",
+    "games total",
+    "win on ",                            # "Will X FC win on YYYY-MM-DD"
+    " vs. ",                              # e.g. "Howard Bison vs. UNCW"
+    " vs ",                               # match markets without period
+    "up or down",                         # crypto 5-min markets
+    "o/u ",                               # over/under sports
+    "both teams to score",
+    "spread:",
+)
+
+
+def _is_sports_market(question: str) -> bool:
+    """Return True if the market looks like a live-game / match-outcome market."""
+    q = question.lower()
+    return any(kw in q for kw in _SPORTS_KEYWORDS)
+
+
 def _parse_dt(raw: object) -> datetime | None:
     if not raw:
         return None
@@ -454,6 +479,11 @@ def parse_args() -> argparse.Namespace:
                    help="Favorite threshold: BUY when price ≥ this (default: 0.65)")
     p.add_argument("--first-entry-only", action="store_true",
                    help="Only take the first zone entry per market (avoids correlation)")
+    p.add_argument("--sell-only", action="store_true",
+                   help="Only take SELL (longshot) signals; skip favorite BUY signals")
+    p.add_argument("--no-sports", action="store_true",
+                   help="Skip live-game markets (esports, football, basketball match winners) "
+                        "where intra-game price swings generate misleading zone entries")
     p.add_argument("--verbose",  action="store_true",
                    help="Print per-market progress")
     p.add_argument("--csv",      default=None,
@@ -476,7 +506,10 @@ def main() -> None:
     print(f"Price history    : up to {args.window}d per market  @ {args.res}")
     print(f"Universe size    : {args.universe} markets")
     print(f"Thresholds       : longshot ≤ {args.longshot}  |  favorite ≥ {args.favorite}")
-    print(f"Entry mode       : {'first entry per market' if args.first_entry_only else 'all zone entries'}")
+    entry_mode = "first entry per market" if args.first_entry_only else "all zone entries"
+    signal_mode = "SELL only" if args.sell_only else "SELL + BUY"
+    print(f"Entry mode       : {entry_mode}  |  signals: {signal_mode}")
+    print(f"Sports filter    : {'on (skip live-game markets)' if args.no_sports else 'off'}")
     print()
 
     # ── Step 1: fetch resolved market list ──────────────────────────────────
@@ -500,6 +533,14 @@ def main() -> None:
         )
 
         if not slug or end_date is None:
+            continue
+
+        # Optional: skip live-game markets whose intra-game price swings
+        # create spurious zone entries not related to the longshot bias.
+        full_question = mkt.get("question", slug)
+        if args.no_sports and _is_sports_market(full_question):
+            if args.verbose:
+                print(f"  [{i:>3}/{len(markets)}]  {question[:52]:<52}  SKIP (sports/esports)")
             continue
 
         # Use now as bt_end so we see the final resolution price.
@@ -534,10 +575,12 @@ def main() -> None:
                 print(f"ERROR {e}")
             continue
 
+        # Optional: keep only SELL (longshot) signals
+        if args.sell_only:
+            trades = [t for t in trades if t.signal == "sell"]
+
         # scan_market returns [] for ambiguous or no-data markets
         if not trades:
-            # Distinguish: try to tell if it's no-data vs ambiguous resolution
-            # (scan_market already handles this silently; we just count)
             n_no_data += 1
             if args.verbose:
                 print("—  (no zone entries or ambiguous resolution)")
