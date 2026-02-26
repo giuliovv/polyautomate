@@ -225,8 +225,8 @@ def scan_market(
     resolution: str = "1h",
     longshot_threshold: float = 0.35,
     favorite_threshold: float = 0.65,
-    min_price: float = 0.04,
-    max_price: float = 0.96,
+    min_price: float = 0.02,
+    max_price: float = 0.98,
     first_entry_only: bool = False,
 ) -> list[LongshotTrade]:
     """
@@ -303,14 +303,14 @@ def scan_market(
 
 # (lo, hi, expected_action)  — "sell" if longshot zone, "buy" if favorite zone
 _CALIBRATION_BUCKETS = [
-    (0.04, 0.10, "sell"),
+    (0.02, 0.10, "sell"),
     (0.10, 0.20, "sell"),
     (0.20, 0.35, "sell"),
     (0.35, 0.50, "—"),
     (0.50, 0.65, "—"),
     (0.65, 0.80, "buy"),
     (0.80, 0.90, "buy"),
-    (0.90, 0.96, "buy"),
+    (0.90, 0.98, "buy"),
 ]
 
 
@@ -502,8 +502,11 @@ def main() -> None:
         if not slug or end_date is None:
             continue
 
-        bt_end   = end_date
-        bt_start = bt_end - timedelta(days=args.window)
+        # Use now as bt_end so we see the final resolution price.
+        # Markets often trade past their scheduled end_date before settling
+        # to 0/1 on-chain; cutting at end_date misses that final movement.
+        bt_end   = now
+        bt_start = now - timedelta(days=args.window)
 
         if args.verbose:
             print(f"  [{i:>3}/{len(markets)}]  {question[:52]:<52}  ", end="", flush=True)
