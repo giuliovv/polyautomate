@@ -281,6 +281,9 @@ if [[ "$DESIRED_SIG" != "$CURRENT_SIG" ]]; then
     -e LONGSHOT_MAX_BANKROLL_FRACTION="$LONGSHOT_MAX_BANKROLL_FRACTION" \
     -e LONGSHOT_MIN_NOTIONAL_USD="$LONGSHOT_MIN_NOTIONAL_USD" \
     -e LONGSHOT_MAX_NOTIONAL_USD="$LONGSHOT_MAX_NOTIONAL_USD" \
+    -e SHADOW_STRATEGY_RUNNER="$SHADOW_STRATEGY_RUNNER" \
+    -e SHADOW_DRY_RUN="$SHADOW_DRY_RUN" \
+    -e SHADOW_ENV_OVERRIDES_JSON="$SHADOW_ENV_OVERRIDES_JSON" \
     --log-driver=awslogs \
     --log-opt awslogs-region="$REGION" \
     --log-opt awslogs-group="$LOG_GROUP" \
@@ -311,6 +314,9 @@ SCRIPT""",
             "echo 'LONGSHOT_MAX_BANKROLL_FRACTION=0.03' >> /etc/polyautomate-executor.env",
             "echo 'LONGSHOT_MIN_NOTIONAL_USD=2' >> /etc/polyautomate-executor.env",
             "echo 'LONGSHOT_MAX_NOTIONAL_USD=25' >> /etc/polyautomate-executor.env",
+            "echo 'SHADOW_STRATEGY_RUNNER=' >> /etc/polyautomate-executor.env",
+            "echo 'SHADOW_DRY_RUN=1' >> /etc/polyautomate-executor.env",
+            "echo 'SHADOW_ENV_OVERRIDES_JSON=' >> /etc/polyautomate-executor.env",
             "bash -lc 'set -a; source /etc/polyautomate-executor.env; set +a; /usr/local/bin/reconcile-executor.sh'",
             "echo '*/10 * * * * root bash -lc \"set -a; source /etc/polyautomate-executor.env; set +a; /usr/local/bin/reconcile-executor.sh\"' > /etc/cron.d/polyautomate-reconcile",
             "chmod 644 /etc/cron.d/polyautomate-reconcile",
