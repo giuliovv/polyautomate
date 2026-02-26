@@ -1,0 +1,73 @@
+slug,question,signal,zone,entry_price,half_spread,resolution,resolution_price,pnl_gross,pnl_net,win
+highest-temperature-in-paris-on-february-26-2026-16c,Will the highest temperature in Paris be 16°C on February 26?,sell,longshot,0.2647,0.0100,NO,0.0005,0.264230,0.254230,1
+wbd-quarterly-earnings-gaap-eps-02-26-2026-0,Will Warner Bros (WBD) beat quarterly earnings?,sell,longshot,0.3260,0.0100,NO,0.0005,0.325500,0.315500,1
+will-the-us-officially-declare-war-on-venezuela-by-june-30-2026,"Will the US officially declare war on Venezuela by June 30, 2026?",sell,longshot,0.3718,0.0100,NO,0.0180,0.353842,0.343842,1
+will-russia-capture-all-of-kupiansk-by-march-31,Will Russia capture all of Kupiansk by March 31?,sell,longshot,0.3813,0.0100,NO,0.0160,0.365333,0.355333,1
+will-turnout-in-the-2025-honduran-general-election-be-greater-than-62,Will turnout in the 2025 Honduran general election be greater than 62%?,sell,longshot,0.1415,0.0100,NO,0.0320,0.109500,0.099500,1
+will-turnout-in-the-2025-honduran-general-election-be-between-61-and-62,Will turnout in the 2025 Honduran general election be between 61% and 62,sell,longshot,0.3572,0.0100,NO,0.0895,0.267667,0.257667,1
+will-turnout-in-the-2025-honduran-general-election-be-between-56-and-57,Will turnout in the 2025 Honduran general election be between 56% and 57,sell,longshot,0.1387,0.0100,NO,0.0350,0.103776,0.093776,1
+will-turnout-in-the-first-round-of-the-2026-costa-rican-presidential-election-be-at-least-72,Will turnout in the first round of the 2026 Costa Rican Presidential Ele,sell,longshot,0.3979,0.0100,NO,0.0013,0.396601,0.386601,1
+will-turnout-in-the-first-round-of-the-2026-costa-rican-presidential-election-be-between-70-and-72,Will turnout in the first round of the 2026 Costa Rican Presidential Ele,sell,longshot,0.2058,0.0100,NO,0.0085,0.197250,0.187250,1
+will-turnout-in-the-first-round-of-the-2026-costa-rican-presidential-election-be-between-68-and-70,Will turnout in the first round of the 2026 Costa Rican Presidential Ele,sell,longshot,0.2409,0.0100,YES,0.9925,-0.751583,-0.761583,0
+will-turnout-in-the-first-round-of-the-2026-costa-rican-presidential-election-be-between-66-and-68,Will turnout in the first round of the 2026 Costa Rican Presidential Ele,sell,longshot,0.2504,0.0100,NO,0.0040,0.246417,0.236417,1
+will-turnout-in-the-first-round-of-the-2026-costa-rican-presidential-election-be-between-64-and-66,Will turnout in the first round of the 2026 Costa Rican Presidential Ele,sell,longshot,0.2454,0.0100,NO,0.0045,0.240917,0.230917,1
+will-the-national-union-for-democracy-and-progress-win-the-most-seats-in-the-2025-central-african-republic-national-assembly-election,Will the National Union for Democracy and Progress win the most seats in,sell,longshot,0.2475,0.0100,NO,0.0055,0.242000,0.232000,1
+will-kwa-na-kwa-win-the-most-seats-in-the-2025-central-african-republic-national-assembly-election,Will Kwa Na Kwa win the most seats in the 2025 Central African Republic ,sell,longshot,0.3284,0.0100,NO,0.0020,0.326417,0.316417,1
+will-the-central-african-democratic-rally-win-the-most-seats-in-the-2025-central-african-republic-national-assembly-election,Will the Central African Democratic Rally win the most seats in the 2025,sell,longshot,0.3497,0.0100,NO,0.0200,0.329667,0.319667,1
+will-the-movement-for-the-liberation-of-the-central-african-people-win-the-most-seats-in-the-2025-central-african-republic-national-assembly-election,Will the Movement for the Liberation of the Central African People win t,sell,longshot,0.2958,0.0100,NO,0.0105,0.285317,0.275317,1
+will-the-national-movement-of-independents-win-the-most-seats-in-the-2025-central-african-republic-national-assembly-election,Will the National Movement of Independents win the most seats in the 202,sell,longshot,0.2776,0.0100,NO,0.0065,0.271067,0.261067,1
+will-the-union-for-central-african-renewal-win-the-most-seats-in-the-2025-central-african-republic-national-assembly-election,Will the Union for Central African Renewal win the most seats in the 202,sell,longshot,0.3351,0.0100,NO,0.0060,0.329083,0.319083,1
+ukraine-election-called-by-march-31-2026,"Ukraine election called by March 31, 2026?",sell,longshot,0.3789,0.0100,NO,0.0352,0.343750,0.333750,1
+will-turnout-in-the-2025-honduran-general-election-be-between-60-and-65,Will turnout in the 2025 Honduran general election be between 60% and 65,sell,longshot,0.3149,0.0100,NO,0.0520,0.262917,0.252917,1
+will-eddie-lumsden-win-the-ga-14-special-election,Will Eddie Lumsden win the GA-14 special election?,sell,longshot,0.1816,0.0100,NO,0.0205,0.161116,0.151116,1
+will-holly-mccormack-win-the-ga-14-special-election,Will Holly McCormack win the GA-14 special election?,sell,longshot,0.0441,0.0100,NO,0.0165,0.027618,0.017618,1
+will-clarence-blalock-win-the-ga-14-special-election,Will Clarence Blalock win the GA-14 special election?,sell,longshot,0.0595,0.0100,NO,0.0265,0.033075,0.023075,1
+will-rob-ruszkowski-win-the-ga-14-special-election,Will Rob Ruszkowski win the GA-14 special election?,sell,longshot,0.0354,0.0100,NO,0.0176,0.017793,0.007793,1
+will-uloma-ekpete-kama-win-the-ga-14-special-election,Will Uloma Ekpete Kama win the GA-14 special election?,sell,longshot,0.0791,0.0100,NO,0.0229,0.056179,0.046179,1
+will-trey-kelley-win-the-ga-14-special-election,Will Trey Kelley win the GA-14 special election?,sell,longshot,0.0648,0.0100,NO,0.0174,0.047430,0.037430,1
+will-matt-barton-win-the-ga-14-special-election,Will Matt Barton win the GA-14 special election?,sell,longshot,0.0218,0.0100,NO,0.0277,-0.005904,-0.015904,0
+will-tyler-paul-smith-win-the-ga-14-special-election,Will Tyler Paul Smith win the GA-14 special election?,sell,longshot,0.0399,0.0100,NO,0.0180,0.021911,0.011911,1
+will-martin-momtahan-win-the-ga-14-special-election,Will Martin Momtahan win the GA-14 special election?,sell,longshot,0.0414,0.0100,NO,0.0174,0.023959,0.013959,1
+will-marcus-flowers-win-the-ga-14-special-election,Will Marcus Flowers win the GA-14 special election?,sell,longshot,0.0633,0.0100,NO,0.0160,0.047304,0.037304,1
+will-shawn-harris-win-the-ga-14-special-election,Will Shawn Harris win the GA-14 special election?,sell,longshot,0.0301,0.0100,NO,0.0656,-0.035444,-0.045444,0
+will-jennifer-strahan-win-the-ga-14-special-election,Will Jennifer Strahan win the GA-14 special election?,sell,longshot,0.0348,0.0100,NO,0.0166,0.018261,0.008261,1
+will-elvis-casely-win-the-ga-14-special-election,Will Elvis Casely win the GA-14 special election?,sell,longshot,0.0640,0.0100,NO,0.0155,0.048451,0.038451,1
+will-jeff-criswell-win-the-ga-14-special-election,Will Jeff Criswell win the GA-14 special election?,sell,longshot,0.0550,0.0100,NO,0.0220,0.033009,0.023009,1
+will-laura-loomer-win-the-ga-14-special-election,Will Laura Loomer win the GA-14 special election?,sell,longshot,0.0300,0.0100,NO,0.0155,0.014500,0.004500,1
+will-jason-anavitarte-win-the-ga-14-special-election,Will Jason Anavitarte win the GA-14 special election?,sell,longshot,0.0649,0.0100,NO,0.0153,0.049596,0.039596,1
+will-star-black-win-the-ga-14-special-election,Will Star Black win the GA-14 special election?,sell,longshot,0.1000,0.0100,NO,0.0208,0.079246,0.069246,1
+will-katie-dempsey-win-the-ga-14-special-election,Will Katie Dempsey win the GA-14 special election?,sell,longshot,0.0399,0.0100,NO,0.0155,0.024412,0.014412,1
+will-kasey-carpenter-win-the-ga-14-special-election,Will Kasey Carpenter win the GA-14 special election?,sell,longshot,0.0647,0.0100,NO,0.0238,0.040942,0.030942,1
+will-chuck-hufstetler-win-the-ga-14-special-election,Will Chuck Hufstetler win the GA-14 special election?,sell,longshot,0.0650,0.0100,NO,0.0237,0.041316,0.031316,1
+will-john-cowan-win-the-ga-14-special-election,Will John Cowan win the GA-14 special election?,sell,longshot,0.0565,0.0100,NO,0.0155,0.041000,0.031000,1
+will-colton-moore-win-the-ga-14-special-election,Will Colton Moore win the GA-14 special election?,sell,longshot,0.1010,0.0100,NO,0.0783,0.022746,0.012746,1
+will-justin-tucker-sign-with-an-nfl-team-this-year,Will Justin Tucker sign with an NFL team this year?,sell,longshot,0.3650,0.0100,NO,0.0206,0.344351,0.334351,1
+israel-and-syria-normalize-relations-by-june-30-2026,"Israel and Syria normalize relations by June 30, 2026?",sell,longshot,0.1479,0.0100,NO,0.0550,0.092941,0.082941,1
+sam-altman-in-jail-by-june-30,Sam Altman in jail by June 30?,sell,longshot,0.0465,0.0100,NO,0.0158,0.030756,0.020756,1
+israel-x-hamas-ceasefire-cancelled-by-march-31-2026-824,"Israel x Hamas ceasefire cancelled by March 31, 2026?",sell,longshot,0.2950,0.0100,NO,0.0550,0.240000,0.230000,1
+will-evelyn-rank-1-among-girl-names-on-the-ssas-official-list-for-2025,Will Evelyn rank #1 among girl names on the SSA’s official list for 2025,sell,longshot,0.0221,0.0100,NO,0.0015,0.020567,0.010567,1
+will-isabella-rank-1-among-girl-names-on-the-ssas-official-list-for-2025,Will Isabella rank #1 among girl names on the SSA’s official list for 20,sell,longshot,0.0215,0.0100,NO,0.0005,0.021042,0.011042,1
+will-mia-rank-1-among-girl-names-on-the-ssas-official-list-for-2025,Will Mia rank #1 among girl names on the SSA’s official list for 2025?,sell,longshot,0.0200,0.0100,NO,0.0055,0.014500,0.004500,1
+will-charlotte-rank-1-among-girl-names-on-the-ssas-official-list-for-2025,Will Charlotte rank #1 among girl names on the SSA’s official list for 2,sell,longshot,0.0205,0.0100,NO,0.0110,0.009500,-0.000500,0
+will-amelia-rank-1-among-girl-names-on-the-ssas-official-list-for-2025,Will Amelia rank #1 among girl names on the SSA’s official list for 2025,sell,longshot,0.0395,0.0100,NO,0.0285,0.011000,0.001000,1
+will-emma-rank-1-among-girl-names-on-the-ssas-official-list-for-2025,Will Emma rank #1 among girl names on the SSA’s official list for 2025?,sell,longshot,0.0310,0.0100,NO,0.0684,-0.037386,-0.047386,0
+will-oliver-rank-1-among-boy-names-on-the-ssas-official-list-for-2025,Will Oliver rank #1 among boy names on the SSA’s official list for 2025?,sell,longshot,0.0237,0.0100,NO,0.0015,0.022208,0.012208,1
+will-noah-rank-1-among-boy-names-on-the-ssas-official-list-for-2025,Will Noah rank #1 among boy names on the SSA’s official list for 2025?,sell,longshot,0.0555,0.0100,NO,0.0800,-0.024500,-0.034500,0
+will-any-country-leave-nato-by-june-30-2026,"Will any country leave NATO by June 30, 2026?",sell,longshot,0.0600,0.0100,NO,0.0405,0.019500,0.009500,1
+ukraine-recognizes-russian-sovereignty-over-its-territory-by-june-30-2026,"Ukraine recognizes Russian sovereignty over its territory by June 30, 20",sell,longshot,0.1750,0.0100,NO,0.0550,0.120000,0.110000,1
+will-russia-invade-a-nato-country-by-june-30-2026,"Will Russia invade a NATO country by June 30, 2026?",sell,longshot,0.0700,0.0100,NO,0.0460,0.024000,0.014000,1
+natoeu-troops-fighting-in-ukraine-in-june-30-2026,"NATO/EU troops fighting in Ukraine in June 30, 2026?",sell,longshot,0.0556,0.0100,NO,0.0220,0.033554,0.023554,1
+will-gpt-6-be-released-by-march-31-2026,"Will GPT-6 be released by March 31, 2026?",sell,longshot,0.2700,0.0100,NO,0.0385,0.231500,0.221500,1
+will-harvey-weinstein-be-sentenced-to-more-than-30-years-in-prison,Will Harvey Weinstein be sentenced to more than 30 years in prison?,sell,longshot,0.1171,0.0100,NO,0.0639,0.053219,0.043219,1
+will-harvey-weinstein-be-sentenced-to-between-5-and-10-years-in-prison,Will Harvey Weinstein be sentenced to between 5 and 10 years in prison?,sell,longshot,0.1255,0.0100,NO,0.0476,0.077949,0.067949,1
+will-harvey-weinstein-be-sentenced-to-less-than-5-years-in-prison,Will Harvey Weinstein be sentenced to less than 5 years in prison?,sell,longshot,0.0234,0.0100,NO,0.0484,-0.024984,-0.034984,0
+will-trump-deport-750000-or-more-people-in-2025,"Will Trump deport 750,000 or more people in 2025?",sell,longshot,0.0368,0.0100,NO,0.0160,0.020784,0.010784,1
+will-trump-deport-2000000-or-more-people,"Will Trump deport 2,000,000 or more people?",sell,longshot,0.0251,0.0100,NO,0.0025,0.022583,0.012583,1
+will-trump-deport-1750000-2000000-people,"Will Trump deport 1,750,000-2,000,000 people?",sell,longshot,0.0283,0.0100,NO,0.0025,0.025767,0.015767,1
+will-trump-deport-1000000-1250000-people,"Will Trump deport 1,000,000-1,250,000 people?",sell,longshot,0.0254,0.0100,NO,0.0024,0.022928,0.012928,1
+will-trump-deport-750000-1000000-people,"Will Trump deport 750,000-1,000,000 people?",sell,longshot,0.0200,0.0100,NO,0.0050,0.015000,0.005000,1
+will-trump-deport-500000-750000-people,"Will Trump deport 500,000-750,000- people?",sell,longshot,0.1202,0.0100,NO,0.0211,0.099157,0.089157,1
+will-trump-deport-less-than-250000,"Will Trump deport less than 250,000?",sell,longshot,0.0350,0.0100,NO,0.0270,0.007956,-0.002044,0
+will-jd-vances-remarks-not-air,Will JD Vance's remarks not air?,sell,longshot,0.3966,0.0100,NO,0.0043,0.392307,0.382307,1
+will-jd-vance-say-crypto-or-bitcoin-in-wisconsin-on-thursday,"Will JD Vance say ""Crypto"" or ""Bitcoin"" in Wisconsin on Thursday?",sell,longshot,0.2350,0.0100,NO,0.0268,0.208175,0.198175,1
+will-jd-vance-say-six-seven-in-wisconsin-on-thursday,"Will JD Vance say ""Six Seven"" in Wisconsin on Thursday?",sell,longshot,0.3730,0.0100,NO,0.0565,0.316544,0.306544,1
