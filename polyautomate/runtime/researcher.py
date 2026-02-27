@@ -371,10 +371,14 @@ def main() -> None:
 
     prior_state = _load_state(state_bucket=state_bucket, state_key=state_key)
     events = _fetch_recent_executor_events(log_group=log_group)
+    executed_events = [e for e in events if "ACTION_EXECUTED" in e.get("message", "")]
+    failed_events = [e for e in events if "executor_cycle_failed" in e.get("message", "")]
     summary = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "executor_action_events_last_24h": len(events),
-        "sample_messages": [e.get("message", "") for e in events[:20]],
+        "executed_actions_last_24h": len(executed_events),
+        "failed_cycles_last_24h": len(failed_events),
+        "sample_action_messages": [e.get("message", "") for e in executed_events[:20]],
+        "sample_failure_messages": [e.get("message", "") for e in failed_events[:20]],
         "prior_state_present": bool(prior_state),
         "previous_run_at": prior_state.get("last_run_at"),
     }
@@ -382,7 +386,12 @@ def main() -> None:
     with open(output_path, "w", encoding="utf-8") as handle:
         json.dump(summary, handle, indent=2)
 
-    LOGGER.info("executor_summary_written path=%s actions=%s", output_path, len(events))
+    LOGGER.info(
+        "executor_summary_written path=%s executed_actions=%s failed_cycles=%s",
+        output_path,
+        len(executed_events),
+        len(failed_events),
+    )
 
     workspace_dir, _branch_name, _base_branch = _prepare_workspace()
     outcome = _execute_research_cycle(
@@ -393,7 +402,8 @@ def main() -> None:
 
     next_state = {
         "last_run_at": datetime.now(timezone.utc).isoformat(),
-        "last_action_event_count": len(events),
+        "last_action_event_count": len(executed_events),
+        "last_failed_cycle_count": len(failed_events),
         "last_backtest_rc": outcome.backtest_rc,
         "last_claude_rc": outcome.claude_rc,
         "last_pr_url": outcome.pr_url,
@@ -403,7 +413,8 @@ def main() -> None:
 
     if outcome.backtest_rc == 0 and outcome.claude_rc == 0:
         msg = (
-            f"Researcher run OK. Actions(24h)={len(events)}. "
+            f"Researcher run OK. Actions(24h)={len(executed_events)}. "
+            f"FailedCycles(24h)={len(failed_events)}. "
             f"PR={outcome.pr_url or 'none'}"
         )
         _send_telegram_message(msg)
