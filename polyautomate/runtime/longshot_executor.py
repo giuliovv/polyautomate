@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac as _hmac
 import json
 import logging
 import os
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -328,14 +332,121 @@ def _estimate_no_win_prob(yes_price: float) -> float:
     return 0.917
 
 
+def _fetch_usdc_balance() -> float | None:
+    """
+    Fetch available USDC balance from the Polymarket CLOB.
+
+    Endpoint: GET /balance-allowance?asset_type=COLLATERAL
+    Auth: HMAC-SHA256 signed with POLY_* headers (Polymarket L2 auth scheme).
+
+    Reads env vars:
+      POLYMARKET_API_KEY          — the CLOB API key
+      POLYMARKET_SIGNING_KEY      — base64url-encoded HMAC secret
+      POLYMARKET_PASSPHRASE       — API passphrase
+      POLYMARKET_SIGNER_ADDRESS   — EOA address (used as POLY_ADDRESS header).
+                                    For proxy/email accounts this differs from
+                                    POLYMARKET_ADDRESS (the proxy wallet). Falls
+                                    back to POLYMARKET_ADDRESS for pure-EOA accounts.
+      POLYMARKET_SIGNATURE_TYPE   — 0 for pure EOA, 1 for Magic/email proxy (default),
+                                    2 for browser-wallet proxy. Passed as the
+                                    signature_type query param so the CLOB returns
+                                    the balance of the correct account.
+
+    Returns the balance as a float (in USD), or None if credentials are missing,
+    the request fails, or the response cannot be parsed.
+    """
+    api_key = os.getenv("POLYMARKET_API_KEY", "")
+    secret_b64 = os.getenv("POLYMARKET_SIGNING_KEY", "")
+    passphrase = os.getenv("POLYMARKET_PASSPHRASE", "")
+    # POLY_ADDRESS must be the EOA (signer) address, not the proxy wallet address.
+    address = os.getenv("POLYMARKET_SIGNER_ADDRESS") or os.getenv("POLYMARKET_ADDRESS", "")
+    signature_type = int(os.getenv("POLYMARKET_SIGNATURE_TYPE", "1"))
+
+    if not api_key or not secret_b64 or not passphrase or not address:
+        LOGGER.debug(
+            "balance_fetch_skipped: missing POLYMARKET_API_KEY / POLYMARKET_SIGNING_KEY"
+            " / POLYMARKET_PASSPHRASE / POLYMARKET_ADDRESS"
+        )
+        return None
+
+    try:
+        secret_bytes = base64.urlsafe_b64decode(secret_b64)
+    except Exception:
+        LOGGER.warning("balance_fetch_failed: cannot decode POLYMARKET_SIGNING_KEY")
+        return None
+
+    base_url = os.getenv("POLYMARKET_CLOB_URL", "https://clob.polymarket.com")
+    path = "/balance-allowance"
+    method = "GET"
+    timestamp = str(int(time.time()))
+    message = f"{timestamp}{method}{path}".encode("utf-8")
+    sig = base64.urlsafe_b64encode(_hmac.new(secret_bytes, message, hashlib.sha256).digest()).decode("utf-8")
+
+    headers = {
+        "POLY_ADDRESS": address,
+        "POLY_API_KEY": api_key,
+        "POLY_TIMESTAMP": timestamp,
+        "POLY_SIGNATURE": sig,
+        "POLY_PASSPHRASE": passphrase,
+    }
+
+    try:
+        resp = requests.get(
+            f"{base_url}{path}",
+            params={"asset_type": "COLLATERAL", "signature_type": signature_type},
+            headers=headers,
+            timeout=10,
+        )
+        if resp.status_code >= 400:
+            LOGGER.warning("balance_fetch_failed status=%d body=%s", resp.status_code, resp.text[:200])
+            return None
+        payload = resp.json()
+    except Exception:
+        LOGGER.exception("balance_fetch_failed")
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+
+    _USDC_DECIMALS = 1_000_000  # USDC uses 6 decimal places on Polygon
+
+    # Flat dict: {"balance": "9483019"} — raw USDC units, divide by 1e6
+    for key in ("USDC", "usdc", "collateral", "free", "available", "balance"):
+        val = payload.get(key)
+        if val is not None:
+            try:
+                raw = float(val)
+                # Values >= 1000 are almost certainly raw on-chain units (micro-USDC);
+                # small values (e.g. from a mock or already-converted response) are used as-is.
+                return raw / _USDC_DECIMALS if raw >= 1000 else raw
+            except (TypeError, ValueError):
+                continue
+    # Nested list: {"balances": [{"asset": "USDC", "balance": "10.5"}]}
+    nested = payload.get("balances") or payload.get("data") or []
+    if isinstance(nested, list):
+        for item in nested:
+            if not isinstance(item, dict):
+                continue
+            asset = str(item.get("asset", item.get("token", ""))).upper()
+            if asset in {"USDC", "COLLATERAL"}:
+                try:
+                    return float(item.get("balance", item.get("amount", 0)))
+                except (TypeError, ValueError):
+                    continue
+    LOGGER.warning("balance_response_unparseable payload=%s", payload)
+    return None
+
+
 def _compute_order_size(
     *,
     yes_price: float,
     no_price: float,
     fallback_size: float,
+    bankroll_usd: float | None = None,
 ) -> SizingDecision:
     use_kelly = os.getenv("LONGSHOT_USE_KELLY", "1") == "1"
-    bankroll_usd = float(os.getenv("LONGSHOT_BANKROLL_USD", "500"))
+    if bankroll_usd is None:
+        bankroll_usd = float(os.getenv("LONGSHOT_BANKROLL_USD", "500"))
     kelly_fraction = float(os.getenv("LONGSHOT_KELLY_FRACTION", "0.25"))
     max_fraction = float(os.getenv("LONGSHOT_MAX_BANKROLL_FRACTION", "0.03"))
     min_notional = float(os.getenv("LONGSHOT_MIN_NOTIONAL_USD", "2"))
@@ -371,6 +482,10 @@ def run_once() -> int:
     pmd_api_key = os.getenv("POLYMARKETDATA_API_KEY", "")
     pm_api_key = os.getenv("POLYMARKET_API_KEY", "")
     pm_signing_key = os.getenv("POLYMARKET_SIGNING_KEY", "")
+    pm_passphrase = os.getenv("POLYMARKET_PASSPHRASE", "")
+    pm_address = os.getenv("POLYMARKET_ADDRESS", "")
+    # EOA address for POLY_ADDRESS header; falls back to pm_address for pure-EOA accounts.
+    pm_signer_address = os.getenv("POLYMARKET_SIGNER_ADDRESS") or pm_address
     dry_run = os.getenv("DRY_RUN", "1") == "1"
 
     if not pmd_api_key:
@@ -395,6 +510,39 @@ def run_once() -> int:
     max_actions = int(os.getenv("LONGSHOT_MAX_ACTIONS_PER_CYCLE", "1"))
 
     pmd = PMDClient(api_key=pmd_api_key)
+
+    # --- Live balance fetch (self-correcting bankroll) ---
+    # In live mode, read the actual USDC balance from Polymarket and use it
+    # as the bankroll for Kelly sizing.  This means sizing automatically scales
+    # with the real account rather than relying on a manually-maintained env var.
+    # In dry-run mode we fall back to LONGSHOT_BANKROLL_USD (no real credentials).
+    trader: PolymarketTradingClient | None = None
+    live_bankroll_usd: float | None = None
+    if not dry_run:
+        if not pm_api_key or not pm_signing_key or not pm_passphrase or not pm_address:
+            LOGGER.warning("missing_trading_credentials")
+            return 0
+        trader = PolymarketTradingClient(
+            api_key=pm_api_key,
+            api_secret=pm_signing_key,
+            api_passphrase=pm_passphrase,
+            address=pm_address,
+            signer_address=pm_signer_address,
+        )
+        live_bankroll_usd = _fetch_usdc_balance()
+        if live_bankroll_usd is not None:
+            LOGGER.info("live_balance_usd=%.2f", live_bankroll_usd)
+            min_notional = float(os.getenv("LONGSHOT_MIN_NOTIONAL_USD", "2"))
+            if live_bankroll_usd < min_notional:
+                LOGGER.warning(
+                    "balance_below_min_notional balance=%.2f min_notional=%.2f — skipping cycle",
+                    live_bankroll_usd,
+                    min_notional,
+                )
+                _save_state(state_path, state)
+                return 0
+        else:
+            LOGGER.warning("balance_fetch_failed — falling back to LONGSHOT_BANKROLL_USD")
 
     # Hold-to-resolution: keep positions open until market resolves/closes.
     for slug, pos in list(open_positions.items()):
@@ -459,13 +607,6 @@ def run_once() -> int:
     if not candidates:
         return 0
 
-    trader = None
-    if not dry_run:
-        if not pm_api_key or not pm_signing_key:
-            LOGGER.warning("missing_trading_credentials")
-            return 0
-        trader = PolymarketTradingClient(api_key=pm_api_key, signing_key=pm_signing_key)
-
     actions = 0
     for c in candidates:
         if actions >= max_actions:
@@ -482,6 +623,7 @@ def run_once() -> int:
             yes_price=c.yes_price,
             no_price=price,
             fallback_size=fallback_order_size,
+            bankroll_usd=live_bankroll_usd,
         )
         order_size = max(round(sizing.size, 4), 0.01)
 

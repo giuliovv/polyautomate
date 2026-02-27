@@ -19,8 +19,13 @@ def prepare_ticket_history(condition_id: str, token_id: str) -> None:
     print(history.to_dataframe().head())
 
 
-def example_order(api_key: str, signing_key: str, token_id: str) -> None:
-    trader = PolymarketTradingClient(api_key=api_key, signing_key=signing_key)
+def example_order(api_key: str, api_secret: str, api_passphrase: str, address: str, token_id: str) -> None:
+    trader = PolymarketTradingClient(
+        api_key=api_key,
+        api_secret=api_secret,
+        api_passphrase=api_passphrase,
+        address=address,
+    )
     expires = datetime.now(tz=timezone.utc) + timedelta(minutes=10)
     order = OrderRequest(
         token_id=token_id,
@@ -48,4 +53,4 @@ if __name__ == "__main__":
     print(f"Archived {len(summary.successes)} price files under {exporter.output_dir}; failures: {summary.failed}")
 
     # Uncomment to place an order once you have credentials.
-    # example_order("pm_api_key", "hex_signing_key", token_id)
+    # example_order("pm_api_key", "base64_api_secret", "api_passphrase", "0x_wallet_address", token_id)
