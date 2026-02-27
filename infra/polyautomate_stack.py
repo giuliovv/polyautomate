@@ -494,6 +494,33 @@ SCRIPT""",
             sns_subscriptions.LambdaSubscription(error_trigger_function)
         )
 
+        # GitHub Actions OIDC — allows CI to push images to ECR without long-lived keys
+        github_oidc_provider = iam.OpenIdConnectProvider(
+            self,
+            "GitHubOidcProvider",
+            url="https://token.actions.githubusercontent.com",
+            client_ids=["sts.amazonaws.com"],
+        )
+
+        github_actions_role = iam.Role(
+            self,
+            "GitHubActionsEcrPushRole",
+            assumed_by=iam.WebIdentityPrincipal(
+                github_oidc_provider.open_id_connect_provider_arn,
+                conditions={
+                    "StringEquals": {
+                        "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+                    },
+                    "StringLike": {
+                        "token.actions.githubusercontent.com:sub": "repo:giuliovv/polyautomate:ref:refs/heads/main",
+                    },
+                },
+            ),
+            description="Assumed by GitHub Actions to push Docker images to ECR",
+        )
+        executor_repo.grant_push(github_actions_role)
+        researcher_repo.grant_push(github_actions_role)
+
         CfnOutput(self, "ExecutorEcrUri", value=executor_repo.repository_uri)
         CfnOutput(self, "ResearcherEcrUri", value=researcher_repo.repository_uri)
         CfnOutput(self, "ExecutorLogGroupName", value=executor_log_group.log_group_name)
@@ -504,3 +531,4 @@ SCRIPT""",
         CfnOutput(self, "ResearcherStateBucketName", value=researcher_state_bucket.bucket_name)
         CfnOutput(self, "ExecutorCredentialsSecretArn", value=executor_credentials_secret.secret_arn)
         CfnOutput(self, "ResearcherCredentialsSecretArn", value=researcher_credentials_secret.secret_arn)
+        CfnOutput(self, "GitHubActionsRoleArn", value=github_actions_role.role_arn)

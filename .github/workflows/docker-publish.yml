@@ -1,0 +1,72 @@
+name: Build & push Docker images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "polyautomate/**"
+      - "docker/**"
+      - "pyproject.toml"
+      - "README.md"
+      - "examples/**"
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+jobs:
+  build-executor:
+    name: Executor image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push executor
+        env:
+          ECR_URI: ${{ secrets.EXECUTOR_ECR_URI }}
+          SHA: ${{ github.sha }}
+        run: |
+          docker build \
+            -f docker/executor/Dockerfile \
+            -t "$ECR_URI:latest" \
+            -t "$ECR_URI:$SHA" \
+            .
+          docker push "$ECR_URI:latest"
+          docker push "$ECR_URI:$SHA"
+
+  build-researcher:
+    name: Researcher image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push researcher
+        env:
+          ECR_URI: ${{ secrets.RESEARCHER_ECR_URI }}
+          SHA: ${{ github.sha }}
+        run: |
+          docker build \
+            -f docker/researcher/Dockerfile \
+            -t "$ECR_URI:latest" \
+            -t "$ECR_URI:$SHA" \
+            .
+          docker push "$ECR_URI:latest"
+          docker push "$ECR_URI:$SHA"
