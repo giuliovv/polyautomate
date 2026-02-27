@@ -6,6 +6,7 @@ import os
 import shlex
 import shutil
 import subprocess
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -30,12 +31,22 @@ class RunOutcome:
     claude_notes: str
 
 
-def _fetch_recent_executor_events(log_group: str, lookback_hours: int = 24) -> list[dict]:
+def _fetch_recent_executor_snapshot(log_group: str, lookback_hours: int = 24) -> tuple[list[dict], dict, dict]:
     logs_client = boto3.client("logs")
     start_time = int((datetime.now(timezone.utc) - timedelta(hours=lookback_hours)).timestamp() * 1000)
     paginator = logs_client.get_paginator("filter_log_events")
 
-    events = []
+    tracked_patterns = {
+        "balance_fetch_failed_401": "balance_fetch_failed status=401",
+        "missing_trading_credentials": "missing_trading_credentials",
+        "executor_cycle_failed": "executor_cycle_failed",
+        "pmd_invalid_api_key": "invalid or expired api key",
+        "clob_edge_blocked": "error code: 1010",
+    }
+
+    events: list[dict] = []
+    signal_counts: Counter[str] = Counter()
+    signal_samples: dict[str, list[str]] = {key: [] for key in tracked_patterns}
     for page in paginator.paginate(
         logGroupName=log_group,
         startTime=start_time,
@@ -44,7 +55,29 @@ def _fetch_recent_executor_events(log_group: str, lookback_hours: int = 24) -> l
             message = event.get("message", "")
             if "ACTION_EXECUTED" in message or "executor_cycle_failed" in message:
                 events.append(event)
-    return events
+            message_lower = message.lower()
+            for label, pattern in tracked_patterns.items():
+                if pattern in message_lower:
+                    signal_counts[label] += 1
+                    if len(signal_samples[label]) < 5:
+                        signal_samples[label].append(message)
+    return events, dict(signal_counts), signal_samples
+
+
+def _operational_issue_lines(signal_counts: dict[str, int]) -> list[str]:
+    issues: list[str] = []
+    if signal_counts.get("balance_fetch_failed_401", 0) > 0:
+        issues.append(f"CLOB auth/login issue: balance_fetch_failed_401={signal_counts['balance_fetch_failed_401']}")
+    if signal_counts.get("missing_trading_credentials", 0) > 0:
+        issues.append(
+            "Credential wiring issue: "
+            f"missing_trading_credentials={signal_counts['missing_trading_credentials']}"
+        )
+    if signal_counts.get("pmd_invalid_api_key", 0) > 0:
+        issues.append(f"PolymarketData auth issue: pmd_invalid_api_key={signal_counts['pmd_invalid_api_key']}")
+    if signal_counts.get("clob_edge_blocked", 0) > 0:
+        issues.append(f"Network/edge block issue: clob_edge_blocked={signal_counts['clob_edge_blocked']}")
+    return issues
 
 
 def _load_state(state_bucket: str | None, state_key: str) -> dict:
@@ -116,6 +149,19 @@ def _run_claude_if_enabled(summary_path: str, prior_state: dict, workspace_dir: 
         "Before proposing changes, summarize what happened and what changed since last run. "
         f"Summary file: {summary_path}. "
         f"Previous handoff notes: {prior_notes}. "
+        "\n\n"
+        "=== OPERATIONS PRIORITY ===\n"
+        "If failed_cycles_last_24h > 0 or failure_signal_counts is non-empty, "
+        "treat this as an incident response pass first, not a strategy tuning pass.\n"
+        "In incident mode:\n"
+        "1) Identify likely root cause from logs/signals.\n"
+        "2) Propose/implement the minimal deterministic fix.\n"
+        "3) Add a focused validation step.\n"
+        "4) Only after incident is resolved, evaluate strategy improvements.\n"
+        "Do not make random strategy updates when auth/runtime failures are present.\n"
+        "\n"
+        "Auth-specific rule: If logs indicate 401 / Unauthorized / Invalid api key, "
+        "prioritize credential plumbing and runtime wiring checks before touching strategy params.\n"
         "\n\n"
         "=== STRATEGY CONTEXT ===\n"
         "\n"
@@ -308,7 +354,9 @@ def _maybe_commit_and_pr(workspace_dir: Path, summary: dict, claude_notes: str) 
 
     body = (
         "Automated researcher update.\n\n"
-        f"- executor_action_events_last_24h: {summary.get('executor_action_events_last_24h')}\n"
+        f"- executed_actions_last_24h: {summary.get('executed_actions_last_24h')}\n"
+        f"- failed_cycles_last_24h: {summary.get('failed_cycles_last_24h')}\n"
+        f"- failure_signal_counts: {summary.get('failure_signal_counts')}\n"
         f"- generated_at: {summary.get('generated_at')}\n\n"
         "Claude notes:\n"
         f"{claude_notes[:4000]}"
@@ -370,13 +418,16 @@ def main() -> None:
     state_key = os.getenv("STATE_KEY", "researcher/state.json")
 
     prior_state = _load_state(state_bucket=state_bucket, state_key=state_key)
-    events = _fetch_recent_executor_events(log_group=log_group)
+    events, signal_counts, signal_samples = _fetch_recent_executor_snapshot(log_group=log_group)
     executed_events = [e for e in events if "ACTION_EXECUTED" in e.get("message", "")]
     failed_events = [e for e in events if "executor_cycle_failed" in e.get("message", "")]
     summary = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "executed_actions_last_24h": len(executed_events),
         "failed_cycles_last_24h": len(failed_events),
+        "failure_signal_counts": signal_counts,
+        "failure_signal_samples": signal_samples,
+        "operational_issue_lines": _operational_issue_lines(signal_counts),
         "sample_action_messages": [e.get("message", "") for e in executed_events[:20]],
         "sample_failure_messages": [e.get("message", "") for e in failed_events[:20]],
         "prior_state_present": bool(prior_state),
@@ -392,6 +443,11 @@ def main() -> None:
         len(executed_events),
         len(failed_events),
     )
+    if summary["operational_issue_lines"]:
+        _send_telegram_message(
+            "Researcher detected non-code operational issues.\n"
+            + "\n".join(f"- {line}" for line in summary["operational_issue_lines"])
+        )
 
     workspace_dir, _branch_name, _base_branch = _prepare_workspace()
     outcome = _execute_research_cycle(
