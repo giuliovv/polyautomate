@@ -328,14 +328,55 @@ def _estimate_no_win_prob(yes_price: float) -> float:
     return 0.917
 
 
+def _fetch_usdc_balance(trader: "PolymarketTradingClient") -> float | None:
+    """
+    Fetch available USDC balance from Polymarket CLOB.
+
+    Returns the balance as a float, or None if the fetch fails or the
+    response cannot be parsed.  The CLOB /balances endpoint may return
+    different shapes depending on API version; we try several common layouts.
+    """
+    try:
+        balances = trader.get_balances()
+    except Exception:
+        LOGGER.exception("balance_fetch_failed")
+        return None
+    if not isinstance(balances, dict):
+        return None
+    # Flat dict: {"USDC": "10.5"} or {"free": "10.5"} or {"available": "10.5"}
+    for key in ("USDC", "usdc", "collateral", "free", "available"):
+        val = balances.get(key)
+        if val is not None:
+            try:
+                return float(val)
+            except (TypeError, ValueError):
+                continue
+    # Nested list: {"balances": [{"asset": "USDC", "balance": "10.5"}, ...]}
+    nested = balances.get("balances") or balances.get("data") or []
+    if isinstance(nested, list):
+        for item in nested:
+            if not isinstance(item, dict):
+                continue
+            asset = str(item.get("asset", item.get("token", ""))).upper()
+            if asset in {"USDC", "COLLATERAL"}:
+                try:
+                    return float(item.get("balance", item.get("amount", 0)))
+                except (TypeError, ValueError):
+                    continue
+    LOGGER.warning("balance_response_unparseable payload=%s", balances)
+    return None
+
+
 def _compute_order_size(
     *,
     yes_price: float,
     no_price: float,
     fallback_size: float,
+    bankroll_usd: float | None = None,
 ) -> SizingDecision:
     use_kelly = os.getenv("LONGSHOT_USE_KELLY", "1") == "1"
-    bankroll_usd = float(os.getenv("LONGSHOT_BANKROLL_USD", "500"))
+    if bankroll_usd is None:
+        bankroll_usd = float(os.getenv("LONGSHOT_BANKROLL_USD", "500"))
     kelly_fraction = float(os.getenv("LONGSHOT_KELLY_FRACTION", "0.25"))
     max_fraction = float(os.getenv("LONGSHOT_MAX_BANKROLL_FRACTION", "0.03"))
     min_notional = float(os.getenv("LONGSHOT_MIN_NOTIONAL_USD", "2"))
@@ -395,6 +436,33 @@ def run_once() -> int:
     max_actions = int(os.getenv("LONGSHOT_MAX_ACTIONS_PER_CYCLE", "1"))
 
     pmd = PMDClient(api_key=pmd_api_key)
+
+    # --- Live balance fetch (self-correcting bankroll) ---
+    # In live mode, read the actual USDC balance from Polymarket and use it
+    # as the bankroll for Kelly sizing.  This means sizing automatically scales
+    # with the real account rather than relying on a manually-maintained env var.
+    # In dry-run mode we fall back to LONGSHOT_BANKROLL_USD (no real credentials).
+    trader: PolymarketTradingClient | None = None
+    live_bankroll_usd: float | None = None
+    if not dry_run:
+        if not pm_api_key or not pm_signing_key:
+            LOGGER.warning("missing_trading_credentials")
+            return 0
+        trader = PolymarketTradingClient(api_key=pm_api_key, signing_key=pm_signing_key)
+        live_bankroll_usd = _fetch_usdc_balance(trader)
+        if live_bankroll_usd is not None:
+            LOGGER.info("live_balance_usd=%.2f", live_bankroll_usd)
+            min_notional = float(os.getenv("LONGSHOT_MIN_NOTIONAL_USD", "2"))
+            if live_bankroll_usd < min_notional:
+                LOGGER.warning(
+                    "balance_below_min_notional balance=%.2f min_notional=%.2f — skipping cycle",
+                    live_bankroll_usd,
+                    min_notional,
+                )
+                _save_state(state_path, state)
+                return 0
+        else:
+            LOGGER.warning("balance_fetch_failed — falling back to LONGSHOT_BANKROLL_USD")
 
     # Hold-to-resolution: keep positions open until market resolves/closes.
     for slug, pos in list(open_positions.items()):
@@ -459,13 +527,6 @@ def run_once() -> int:
     if not candidates:
         return 0
 
-    trader = None
-    if not dry_run:
-        if not pm_api_key or not pm_signing_key:
-            LOGGER.warning("missing_trading_credentials")
-            return 0
-        trader = PolymarketTradingClient(api_key=pm_api_key, signing_key=pm_signing_key)
-
     actions = 0
     for c in candidates:
         if actions >= max_actions:
@@ -482,6 +543,7 @@ def run_once() -> int:
             yes_price=c.yes_price,
             no_price=price,
             fallback_size=fallback_order_size,
+            bankroll_usd=live_bankroll_usd,
         )
         order_size = max(round(sizing.size, 4), 0.01)
 
