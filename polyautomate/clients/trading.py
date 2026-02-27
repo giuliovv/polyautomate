@@ -24,6 +24,7 @@ class PolymarketTradingClient(BaseAPIClient):
         api_secret: str,
         api_passphrase: str,
         address: str,
+        signer_address: Optional[str] = None,
         base_url: str = DEFAULT_BASE_URL,
         session=None,
         timeout: float = 10.0,
@@ -33,6 +34,10 @@ class PolymarketTradingClient(BaseAPIClient):
         self._api_secret = api_secret
         self._api_passphrase = api_passphrase
         self._address = address
+        # POLY_ADDRESS must be the EOA (signer) address. For proxy/email accounts
+        # this differs from `address` (the proxy wallet / funder). Falls back to
+        # `address` for pure-EOA accounts where they are the same.
+        self._signer_address = signer_address or address
 
     def place_order(
         self,
@@ -79,13 +84,13 @@ class PolymarketTradingClient(BaseAPIClient):
         if body_str:
             message += body_str.replace("'", '"')
 
-        secret_bytes = base64.urlsafe_b64decode(self._api_secret + "==")
+        secret_bytes = base64.urlsafe_b64decode(self._api_secret)
         sig = base64.urlsafe_b64encode(
             _hmac.new(secret_bytes, message.encode("utf-8"), hashlib.sha256).digest()
         ).decode("utf-8")
 
         headers = {
-            "POLY_ADDRESS": self._address,
+            "POLY_ADDRESS": self._signer_address,
             "POLY_SIGNATURE": sig,
             "POLY_TIMESTAMP": timestamp,
             "POLY_API_KEY": self.api_key,

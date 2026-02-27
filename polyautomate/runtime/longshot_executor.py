@@ -340,9 +340,13 @@ def _fetch_usdc_balance() -> float | None:
     Auth: HMAC-SHA256 signed with POLY_* headers (Polymarket L2 auth scheme).
 
     Reads env vars:
-      POLYMARKET_API_KEY     — the CLOB API key
-      POLYMARKET_SECRET      — base64url-encoded HMAC secret
-      POLYMARKET_PASSPHRASE  — API passphrase
+      POLYMARKET_API_KEY          — the CLOB API key
+      POLYMARKET_SIGNING_KEY      — base64url-encoded HMAC secret
+      POLYMARKET_PASSPHRASE       — API passphrase
+      POLYMARKET_SIGNER_ADDRESS   — EOA address (used as POLY_ADDRESS header).
+                                    For proxy/email accounts this differs from
+                                    POLYMARKET_ADDRESS (the proxy wallet). Falls
+                                    back to POLYMARKET_ADDRESS for pure-EOA accounts.
 
     Returns the balance as a float, or None if credentials are missing,
     the request fails, or the response cannot be parsed.
@@ -350,7 +354,8 @@ def _fetch_usdc_balance() -> float | None:
     api_key = os.getenv("POLYMARKET_API_KEY", "")
     secret_b64 = os.getenv("POLYMARKET_SIGNING_KEY", "")
     passphrase = os.getenv("POLYMARKET_PASSPHRASE", "")
-    address = os.getenv("POLYMARKET_ADDRESS", "")
+    # POLY_ADDRESS must be the EOA (signer) address, not the proxy wallet address.
+    address = os.getenv("POLYMARKET_SIGNER_ADDRESS") or os.getenv("POLYMARKET_ADDRESS", "")
 
     if not api_key or not secret_b64 or not passphrase or not address:
         LOGGER.debug(
@@ -360,7 +365,7 @@ def _fetch_usdc_balance() -> float | None:
         return None
 
     try:
-        secret_bytes = base64.urlsafe_b64decode(secret_b64 + "==")
+        secret_bytes = base64.urlsafe_b64decode(secret_b64)
     except Exception:
         LOGGER.warning("balance_fetch_failed: cannot decode POLYMARKET_SIGNING_KEY")
         return None
@@ -468,6 +473,8 @@ def run_once() -> int:
     pm_signing_key = os.getenv("POLYMARKET_SIGNING_KEY", "")
     pm_passphrase = os.getenv("POLYMARKET_PASSPHRASE", "")
     pm_address = os.getenv("POLYMARKET_ADDRESS", "")
+    # EOA address for POLY_ADDRESS header; falls back to pm_address for pure-EOA accounts.
+    pm_signer_address = os.getenv("POLYMARKET_SIGNER_ADDRESS") or pm_address
     dry_run = os.getenv("DRY_RUN", "1") == "1"
 
     if not pmd_api_key:
@@ -509,6 +516,7 @@ def run_once() -> int:
             api_secret=pm_signing_key,
             api_passphrase=pm_passphrase,
             address=pm_address,
+            signer_address=pm_signer_address,
         )
         live_bankroll_usd = _fetch_usdc_balance()
         if live_bankroll_usd is not None:
