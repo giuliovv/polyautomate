@@ -17,67 +17,162 @@ from polyautomate.runtime.longshot_executor import (
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+_VALID_CREDS = {
+    "POLYMARKET_API_KEY": "test-key",
+    # base64url("testsecret") — valid decodable string
+    "POLYMARKET_SECRET": "dGVzdHNlY3JldA==",
+    "POLYMARKET_PASSPHRASE": "test-passphrase",
+}
+
+
+def _mock_response(json_body, status_code=200):
+    resp = MagicMock()
+    resp.status_code = status_code
+    resp.text = str(json_body)
+    resp.json.return_value = json_body
+    return resp
+
+
+# ---------------------------------------------------------------------------
 # _fetch_usdc_balance
 # ---------------------------------------------------------------------------
 
 class TestFetchUsdcBalance:
     """Covers all response-shape variants and failure paths."""
 
-    def _trader(self, return_value):
-        t = MagicMock()
-        t.get_balances.return_value = return_value
-        return t
+    def _fetch(self, json_body, status_code=200):
+        """Patch requests.get and valid env creds; return _fetch_usdc_balance()."""
+        with patch.dict(os.environ, _VALID_CREDS, clear=False), \
+             patch("polyautomate.runtime.longshot_executor.requests.get",
+                   return_value=_mock_response(json_body, status_code)):
+            return _fetch_usdc_balance()
+
+    # --- flat-dict response shapes ---
 
     def test_flat_usdc_key(self):
-        assert _fetch_usdc_balance(self._trader({"USDC": "10.50"})) == pytest.approx(10.50)
+        assert self._fetch({"USDC": "10.50"}) == pytest.approx(10.50)
 
     def test_flat_usdc_key_lowercase(self):
-        assert _fetch_usdc_balance(self._trader({"usdc": "7.00"})) == pytest.approx(7.00)
+        assert self._fetch({"usdc": "7.00"}) == pytest.approx(7.00)
 
     def test_flat_free_key(self):
-        assert _fetch_usdc_balance(self._trader({"free": "3.25"})) == pytest.approx(3.25)
+        assert self._fetch({"free": "3.25"}) == pytest.approx(3.25)
 
     def test_flat_available_key(self):
-        assert _fetch_usdc_balance(self._trader({"available": "99.0"})) == pytest.approx(99.0)
+        assert self._fetch({"available": "99.0"}) == pytest.approx(99.0)
 
     def test_flat_collateral_key(self):
-        assert _fetch_usdc_balance(self._trader({"collateral": "50.0"})) == pytest.approx(50.0)
+        assert self._fetch({"collateral": "50.0"}) == pytest.approx(50.0)
+
+    def test_flat_balance_key(self):
+        assert self._fetch({"balance": "42.0"}) == pytest.approx(42.0)
+
+    # --- nested-list response shapes ---
 
     def test_nested_balances_list(self):
         payload = {"balances": [{"asset": "USDC", "balance": "12.34"}]}
-        assert _fetch_usdc_balance(self._trader(payload)) == pytest.approx(12.34)
+        assert self._fetch(payload) == pytest.approx(12.34)
 
     def test_nested_data_list(self):
         payload = {"data": [{"asset": "ETH", "balance": "0"}, {"asset": "USDC", "balance": "5.0"}]}
-        assert _fetch_usdc_balance(self._trader(payload)) == pytest.approx(5.0)
+        assert self._fetch(payload) == pytest.approx(5.0)
 
     def test_nested_collateral_asset(self):
         payload = {"balances": [{"asset": "COLLATERAL", "balance": "20.0"}]}
-        assert _fetch_usdc_balance(self._trader(payload)) == pytest.approx(20.0)
+        assert self._fetch(payload) == pytest.approx(20.0)
+
+    # --- value type variants ---
 
     def test_float_value_not_string(self):
-        assert _fetch_usdc_balance(self._trader({"USDC": 8.5})) == pytest.approx(8.5)
+        assert self._fetch({"USDC": 8.5}) == pytest.approx(8.5)
 
     def test_zero_balance(self):
-        assert _fetch_usdc_balance(self._trader({"USDC": "0.00"})) == pytest.approx(0.0)
+        assert self._fetch({"USDC": "0.00"}) == pytest.approx(0.0)
+
+    # --- error / unrecognised shapes ---
+
+    def test_http_error_returns_none(self):
+        assert self._fetch({"USDC": "10"}, status_code=401) is None
 
     def test_api_raises_exception(self):
-        t = MagicMock()
-        t.get_balances.side_effect = Exception("network error")
-        assert _fetch_usdc_balance(t) is None
+        with patch.dict(os.environ, _VALID_CREDS, clear=False), \
+             patch("polyautomate.runtime.longshot_executor.requests.get",
+                   side_effect=Exception("network error")):
+            assert _fetch_usdc_balance() is None
 
     def test_non_dict_response(self):
-        assert _fetch_usdc_balance(self._trader(None)) is None
-        assert _fetch_usdc_balance(self._trader([])) is None
-        assert _fetch_usdc_balance(self._trader("bad")) is None
+        assert self._fetch(None) is None
+        assert self._fetch([]) is None
+        assert self._fetch("bad") is None
 
     def test_unparseable_dict(self):
-        # Dict with no recognised keys
-        assert _fetch_usdc_balance(self._trader({"foo": "bar"})) is None
+        # Dict with no recognised keys → None
+        assert self._fetch({"foo": "bar"}) is None
 
     def test_bad_value_type_falls_through(self):
-        # Unparseable value in flat key → should return None (no crash)
-        assert _fetch_usdc_balance(self._trader({"USDC": "not-a-number"})) is None
+        # Unparseable value in flat key → None, no crash
+        assert self._fetch({"USDC": "not-a-number"}) is None
+
+    # --- missing credentials ---
+
+    def test_missing_all_credentials_returns_none(self):
+        no_creds = {"POLYMARKET_API_KEY": "", "POLYMARKET_SECRET": "", "POLYMARKET_PASSPHRASE": ""}
+        with patch.dict(os.environ, no_creds, clear=False), \
+             patch("polyautomate.runtime.longshot_executor.requests.get") as mock_get:
+            result = _fetch_usdc_balance()
+        assert result is None
+        mock_get.assert_not_called()
+
+    def test_missing_secret_returns_none(self):
+        creds = {**_VALID_CREDS, "POLYMARKET_SECRET": ""}
+        with patch.dict(os.environ, creds, clear=False), \
+             patch("polyautomate.runtime.longshot_executor.requests.get") as mock_get:
+            result = _fetch_usdc_balance()
+        assert result is None
+        mock_get.assert_not_called()
+
+    def test_invalid_secret_encoding_returns_none(self):
+        # Python's base64 module silently strips non-alphabet chars, so a
+        # string like "!!!not-base64!!!" will still "decode" to garbage bytes.
+        # The function should make the request (with a garbage signature), get
+        # an unrecognised response shape, and return None without crashing.
+        creds = {**_VALID_CREDS, "POLYMARKET_SECRET": "!!!not-base64!!!"}
+        with patch.dict(os.environ, creds, clear=False), \
+             patch("polyautomate.runtime.longshot_executor.requests.get",
+                   return_value=_mock_response({"unrecognised_key": "10.0"})):
+            result = _fetch_usdc_balance()
+        assert result is None
+
+    def test_signs_request_with_poly_headers(self):
+        """Verify that POLY_* headers are sent (not X-* headers)."""
+        with patch.dict(os.environ, _VALID_CREDS, clear=False), \
+             patch("polyautomate.runtime.longshot_executor.requests.get",
+                   return_value=_mock_response({"USDC": "1.0"})) as mock_get:
+            _fetch_usdc_balance()
+        _, call_kwargs = mock_get.call_args
+        headers = call_kwargs.get("headers", {})
+        assert "POLY_API_KEY" in headers
+        assert "POLY_SIGNATURE" in headers
+        assert "POLY_TIMESTAMP" in headers
+        assert "POLY_PASSPHRASE" in headers
+        # Must NOT use the old ed25519 header scheme
+        assert "X-API-Key" not in headers
+        assert "X-Signature" not in headers
+
+    def test_uses_correct_endpoint(self):
+        """Verify the correct endpoint and query param are used."""
+        with patch.dict(os.environ, _VALID_CREDS, clear=False), \
+             patch("polyautomate.runtime.longshot_executor.requests.get",
+                   return_value=_mock_response({"USDC": "1.0"})) as mock_get:
+            _fetch_usdc_balance()
+        call_args, call_kwargs = mock_get.call_args
+        url = call_args[0] if call_args else call_kwargs.get("url", "")
+        assert "/balance-allowance" in url
+        params = call_kwargs.get("params", {})
+        assert params.get("asset_type") == "COLLATERAL"
 
 
 # ---------------------------------------------------------------------------

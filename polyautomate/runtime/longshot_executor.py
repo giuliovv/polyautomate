@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac as _hmac
 import json
 import logging
 import os
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -328,31 +332,77 @@ def _estimate_no_win_prob(yes_price: float) -> float:
     return 0.917
 
 
-def _fetch_usdc_balance(trader: "PolymarketTradingClient") -> float | None:
+def _fetch_usdc_balance() -> float | None:
     """
-    Fetch available USDC balance from Polymarket CLOB.
+    Fetch available USDC balance from the Polymarket CLOB.
 
-    Returns the balance as a float, or None if the fetch fails or the
-    response cannot be parsed.  The CLOB /balances endpoint may return
-    different shapes depending on API version; we try several common layouts.
+    Endpoint: GET /balance-allowance?asset_type=COLLATERAL
+    Auth: HMAC-SHA256 signed with POLY_* headers (Polymarket L2 auth scheme).
+
+    Reads env vars:
+      POLYMARKET_API_KEY     — the CLOB API key
+      POLYMARKET_SECRET      — base64url-encoded HMAC secret
+      POLYMARKET_PASSPHRASE  — API passphrase
+
+    Returns the balance as a float, or None if credentials are missing,
+    the request fails, or the response cannot be parsed.
     """
+    api_key = os.getenv("POLYMARKET_API_KEY", "")
+    secret_b64 = os.getenv("POLYMARKET_SECRET", "")
+    passphrase = os.getenv("POLYMARKET_PASSPHRASE", "")
+
+    if not api_key or not secret_b64 or not passphrase:
+        LOGGER.debug("balance_fetch_skipped: missing POLYMARKET_API_KEY / POLYMARKET_SECRET / POLYMARKET_PASSPHRASE")
+        return None
+
     try:
-        balances = trader.get_balances()
+        secret_bytes = base64.urlsafe_b64decode(secret_b64 + "==")
+    except Exception:
+        LOGGER.warning("balance_fetch_failed: cannot decode POLYMARKET_SECRET")
+        return None
+
+    base_url = os.getenv("POLYMARKET_CLOB_URL", "https://clob.polymarket.com")
+    path = "/balance-allowance"
+    method = "GET"
+    timestamp = str(int(time.time()))
+    message = f"{timestamp}{method}{path}".encode("utf-8")
+    sig = base64.b64encode(_hmac.new(secret_bytes, message, hashlib.sha256).digest()).decode("utf-8")
+
+    headers = {
+        "POLY_API_KEY": api_key,
+        "POLY_TIMESTAMP": timestamp,
+        "POLY_SIGNATURE": sig,
+        "POLY_PASSPHRASE": passphrase,
+        "Content-Type": "application/json",
+    }
+
+    try:
+        resp = requests.get(
+            f"{base_url}{path}",
+            params={"asset_type": "COLLATERAL"},
+            headers=headers,
+            timeout=10,
+        )
+        if resp.status_code >= 400:
+            LOGGER.warning("balance_fetch_failed status=%d body=%s", resp.status_code, resp.text[:200])
+            return None
+        payload = resp.json()
     except Exception:
         LOGGER.exception("balance_fetch_failed")
         return None
-    if not isinstance(balances, dict):
+
+    if not isinstance(payload, dict):
         return None
-    # Flat dict: {"USDC": "10.5"} or {"free": "10.5"} or {"available": "10.5"}
-    for key in ("USDC", "usdc", "collateral", "free", "available"):
-        val = balances.get(key)
+    # Flat dict: {"USDC": "10.5"} or {"collateral": "10.5"} etc.
+    for key in ("USDC", "usdc", "collateral", "free", "available", "balance"):
+        val = payload.get(key)
         if val is not None:
             try:
                 return float(val)
             except (TypeError, ValueError):
                 continue
-    # Nested list: {"balances": [{"asset": "USDC", "balance": "10.5"}, ...]}
-    nested = balances.get("balances") or balances.get("data") or []
+    # Nested list: {"balances": [{"asset": "USDC", "balance": "10.5"}]}
+    nested = payload.get("balances") or payload.get("data") or []
     if isinstance(nested, list):
         for item in nested:
             if not isinstance(item, dict):
@@ -363,7 +413,7 @@ def _fetch_usdc_balance(trader: "PolymarketTradingClient") -> float | None:
                     return float(item.get("balance", item.get("amount", 0)))
                 except (TypeError, ValueError):
                     continue
-    LOGGER.warning("balance_response_unparseable payload=%s", balances)
+    LOGGER.warning("balance_response_unparseable payload=%s", payload)
     return None
 
 
@@ -449,7 +499,7 @@ def run_once() -> int:
             LOGGER.warning("missing_trading_credentials")
             return 0
         trader = PolymarketTradingClient(api_key=pm_api_key, signing_key=pm_signing_key)
-        live_bankroll_usd = _fetch_usdc_balance(trader)
+        live_bankroll_usd = _fetch_usdc_balance()
         if live_bankroll_usd is not None:
             LOGGER.info("live_balance_usd=%.2f", live_bankroll_usd)
             min_notional = float(os.getenv("LONGSHOT_MIN_NOTIONAL_USD", "2"))
