@@ -39,9 +39,11 @@ def _fetch_recent_executor_events(log_group: str, lookback_hours: int = 24) -> l
     for page in paginator.paginate(
         logGroupName=log_group,
         startTime=start_time,
-        filterPattern='"ACTION_EXECUTED" "executor_cycle_failed"',
     ):
-        events.extend(page.get("events", []))
+        for event in page.get("events", []):
+            message = event.get("message", "")
+            if "ACTION_EXECUTED" in message or "executor_cycle_failed" in message:
+                events.append(event)
     return events
 
 
