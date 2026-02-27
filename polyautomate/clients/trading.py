@@ -1,39 +1,38 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac as _hmac
 import time
 from typing import Any, Dict, List, Optional
-
-try:
-    from nacl import signing  # type: ignore
-except ImportError:  # pragma: no cover - optional dependency
-    signing = None
 
 from .base import BaseAPIClient, DEFAULT_BASE_URL, RequestContext, _json_dumps, _normalize_path
 from ..models import OrderRequest, OrderResponse
 
 
 class PolymarketTradingClient(BaseAPIClient):
-    """Authenticated helper for interacting with the CLOB trading API."""
+    """Authenticated helper for interacting with the CLOB trading API.
+
+    Uses Polymarket L2 auth: HMAC-SHA256 signed requests with POLY_* headers.
+    See: https://docs.polymarket.com/#authentication
+    """
 
     def __init__(
         self,
         *,
         api_key: str,
-        signing_key: str,
+        api_secret: str,
+        api_passphrase: str,
+        address: str,
         base_url: str = DEFAULT_BASE_URL,
         session=None,
         timeout: float = 10.0,
-        signature_type: str = "ed25519",
     ) -> None:
         super().__init__(base_url=base_url, session=session, timeout=timeout)
-        if signing is None:
-            raise ImportError(
-                "pynacl is required for signing requests. Install it via 'pip install pynacl'."
-            )
         self.api_key = api_key
-        self._signing_key_hex = signing_key
-        self.signature_type = signature_type
-        self._signing_key = signing.SigningKey(bytes.fromhex(signing_key))
+        self._api_secret = api_secret
+        self._api_passphrase = api_passphrase
+        self._address = address
 
     def place_order(
         self,
@@ -66,20 +65,30 @@ class PolymarketTradingClient(BaseAPIClient):
         return payload or []
 
     def get_balances(self) -> Dict[str, Any]:
-        ctx = RequestContext(method="GET", path="/balances", body=None, params=None)
+        ctx = RequestContext(method="GET", path="/balance-allowance", body=None, params={"asset_type": "COLLATERAL"})
         payload = self._signed_request(ctx)
         return payload or {}
 
     def _signed_request(self, ctx: RequestContext) -> Any:
         path = _normalize_path(ctx.path)
-        timestamp = str(int(time.time() * 1000))
-        body_serialized = _json_dumps(ctx.body)
-        prehash = f"{timestamp}{ctx.method.upper()}{path}{body_serialized}".encode()
-        signature = self._signing_key.sign(prehash).signature
+        timestamp = str(int(time.time()))
+        body_str = _json_dumps(ctx.body)
+
+        # Build the message: timestamp + method + path + body (body omitted if empty)
+        message = f"{timestamp}{ctx.method.upper()}{path}"
+        if body_str:
+            message += body_str.replace("'", '"')
+
+        secret_bytes = base64.urlsafe_b64decode(self._api_secret + "==")
+        sig = base64.urlsafe_b64encode(
+            _hmac.new(secret_bytes, message.encode("utf-8"), hashlib.sha256).digest()
+        ).decode("utf-8")
+
         headers = {
-            "X-API-Key": self.api_key,
-            "X-Timestamp": timestamp,
-            "X-Signature": signature.hex(),
-            "X-Signature-Type": self.signature_type,
+            "POLY_ADDRESS": self._address,
+            "POLY_SIGNATURE": sig,
+            "POLY_TIMESTAMP": timestamp,
+            "POLY_API_KEY": self.api_key,
+            "POLY_PASSPHRASE": self._api_passphrase,
         }
         return self._request(ctx, headers=headers)

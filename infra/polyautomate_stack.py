@@ -93,7 +93,7 @@ class PolyautomateStack(cdk.Stack):
             "ExecutorCredentialsSecret",
             description="Executor runtime credentials for Polymarket trading",
             generate_secret_string=secretsmanager.SecretStringGenerator(
-                secret_string_template='{"POLYMARKET_API_KEY":"REPLACE_ME","POLYMARKET_PASSPHRASE":"REPLACE_ME","POLYMARKET_SIGNING_KEY":"REPLACE_ME","POLYMARKETDATA_API_KEY":"REPLACE_ME","TELEGRAM_BOT_TOKEN":"REPLACE_ME","TELEGRAM_CHAT_ID":"REPLACE_ME","EXECUTOR_GITHUB_TOKEN":"REPLACE_ME"}',
+                secret_string_template='{"POLYMARKET_API_KEY":"REPLACE_ME","POLYMARKET_PASSPHRASE":"REPLACE_ME","POLYMARKET_SIGNING_KEY":"REPLACE_ME","POLYMARKET_ADDRESS":"REPLACE_ME","POLYMARKETDATA_API_KEY":"REPLACE_ME","TELEGRAM_BOT_TOKEN":"REPLACE_ME","TELEGRAM_CHAT_ID":"REPLACE_ME","EXECUTOR_GITHUB_TOKEN":"REPLACE_ME"}',
                 generate_string_key="bootstrap",
             ),
         )
@@ -227,6 +227,7 @@ SECRET_JSON="$(aws secretsmanager get-secret-value --region "$REGION" --secret-i
 POLYMARKET_API_KEY="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_API_KEY", ""))')"
 POLYMARKET_PASSPHRASE="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_PASSPHRASE", ""))')"
 POLYMARKET_SIGNING_KEY="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_SIGNING_KEY", ""))')"
+POLYMARKET_ADDRESS="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_ADDRESS", ""))')"
 POLYMARKETDATA_API_KEY="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKETDATA_API_KEY", ""))')"
 TELEGRAM_BOT_TOKEN="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("TELEGRAM_BOT_TOKEN", ""))')"
 TELEGRAM_CHAT_ID="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("TELEGRAM_CHAT_ID", ""))')"
@@ -254,7 +255,7 @@ else
 fi
 
 NEW_SHA="$(git -C "$REPO_DIR" rev-parse HEAD)"
-SECRET_SIG="$(printf '%s' "$POLYMARKET_API_KEY:$POLYMARKET_PASSPHRASE:$POLYMARKET_SIGNING_KEY:$POLL_SECONDS:$STRATEGY_RUNNER" | sha256sum | awk '{print $1}')"
+SECRET_SIG="$(printf '%s' "$POLYMARKET_API_KEY:$POLYMARKET_PASSPHRASE:$POLYMARKET_SIGNING_KEY:$POLYMARKET_ADDRESS:$POLL_SECONDS:$STRATEGY_RUNNER" | sha256sum | awk '{print $1}')"
 DESIRED_SIG="$NEW_SHA:$SECRET_SIG"
 CURRENT_SIG="$(cat "$STATE_DIR/deploy.sig" 2>/dev/null || true)"
 
@@ -269,6 +270,7 @@ if [[ "$DESIRED_SIG" != "$CURRENT_SIG" ]]; then
     -e POLYMARKET_API_KEY="$POLYMARKET_API_KEY" \
     -e POLYMARKET_PASSPHRASE="$POLYMARKET_PASSPHRASE" \
     -e POLYMARKET_SIGNING_KEY="$POLYMARKET_SIGNING_KEY" \
+    -e POLYMARKET_ADDRESS="$POLYMARKET_ADDRESS" \
     -e POLYMARKETDATA_API_KEY="$POLYMARKETDATA_API_KEY" \
     -e TELEGRAM_BOT_TOKEN="$TELEGRAM_BOT_TOKEN" \
     -e TELEGRAM_CHAT_ID="$TELEGRAM_CHAT_ID" \

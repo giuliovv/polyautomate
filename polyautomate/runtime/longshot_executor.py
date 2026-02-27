@@ -348,17 +348,21 @@ def _fetch_usdc_balance() -> float | None:
     the request fails, or the response cannot be parsed.
     """
     api_key = os.getenv("POLYMARKET_API_KEY", "")
-    secret_b64 = os.getenv("POLYMARKET_SECRET", "")
+    secret_b64 = os.getenv("POLYMARKET_SIGNING_KEY", "")
     passphrase = os.getenv("POLYMARKET_PASSPHRASE", "")
+    address = os.getenv("POLYMARKET_ADDRESS", "")
 
-    if not api_key or not secret_b64 or not passphrase:
-        LOGGER.debug("balance_fetch_skipped: missing POLYMARKET_API_KEY / POLYMARKET_SECRET / POLYMARKET_PASSPHRASE")
+    if not api_key or not secret_b64 or not passphrase or not address:
+        LOGGER.debug(
+            "balance_fetch_skipped: missing POLYMARKET_API_KEY / POLYMARKET_SIGNING_KEY"
+            " / POLYMARKET_PASSPHRASE / POLYMARKET_ADDRESS"
+        )
         return None
 
     try:
         secret_bytes = base64.urlsafe_b64decode(secret_b64 + "==")
     except Exception:
-        LOGGER.warning("balance_fetch_failed: cannot decode POLYMARKET_SECRET")
+        LOGGER.warning("balance_fetch_failed: cannot decode POLYMARKET_SIGNING_KEY")
         return None
 
     base_url = os.getenv("POLYMARKET_CLOB_URL", "https://clob.polymarket.com")
@@ -366,14 +370,14 @@ def _fetch_usdc_balance() -> float | None:
     method = "GET"
     timestamp = str(int(time.time()))
     message = f"{timestamp}{method}{path}".encode("utf-8")
-    sig = base64.b64encode(_hmac.new(secret_bytes, message, hashlib.sha256).digest()).decode("utf-8")
+    sig = base64.urlsafe_b64encode(_hmac.new(secret_bytes, message, hashlib.sha256).digest()).decode("utf-8")
 
     headers = {
+        "POLY_ADDRESS": address,
         "POLY_API_KEY": api_key,
         "POLY_TIMESTAMP": timestamp,
         "POLY_SIGNATURE": sig,
         "POLY_PASSPHRASE": passphrase,
-        "Content-Type": "application/json",
     }
 
     try:
@@ -462,6 +466,8 @@ def run_once() -> int:
     pmd_api_key = os.getenv("POLYMARKETDATA_API_KEY", "")
     pm_api_key = os.getenv("POLYMARKET_API_KEY", "")
     pm_signing_key = os.getenv("POLYMARKET_SIGNING_KEY", "")
+    pm_passphrase = os.getenv("POLYMARKET_PASSPHRASE", "")
+    pm_address = os.getenv("POLYMARKET_ADDRESS", "")
     dry_run = os.getenv("DRY_RUN", "1") == "1"
 
     if not pmd_api_key:
@@ -495,10 +501,15 @@ def run_once() -> int:
     trader: PolymarketTradingClient | None = None
     live_bankroll_usd: float | None = None
     if not dry_run:
-        if not pm_api_key or not pm_signing_key:
+        if not pm_api_key or not pm_signing_key or not pm_passphrase or not pm_address:
             LOGGER.warning("missing_trading_credentials")
             return 0
-        trader = PolymarketTradingClient(api_key=pm_api_key, signing_key=pm_signing_key)
+        trader = PolymarketTradingClient(
+            api_key=pm_api_key,
+            api_secret=pm_signing_key,
+            api_passphrase=pm_passphrase,
+            address=pm_address,
+        )
         live_bankroll_usd = _fetch_usdc_balance()
         if live_bankroll_usd is not None:
             LOGGER.info("live_balance_usd=%.2f", live_bankroll_usd)
