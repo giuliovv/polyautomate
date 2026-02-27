@@ -347,8 +347,12 @@ def _fetch_usdc_balance() -> float | None:
                                     For proxy/email accounts this differs from
                                     POLYMARKET_ADDRESS (the proxy wallet). Falls
                                     back to POLYMARKET_ADDRESS for pure-EOA accounts.
+      POLYMARKET_SIGNATURE_TYPE   — 0 for pure EOA, 1 for Magic/email proxy (default),
+                                    2 for browser-wallet proxy. Passed as the
+                                    signature_type query param so the CLOB returns
+                                    the balance of the correct account.
 
-    Returns the balance as a float, or None if credentials are missing,
+    Returns the balance as a float (in USD), or None if credentials are missing,
     the request fails, or the response cannot be parsed.
     """
     api_key = os.getenv("POLYMARKET_API_KEY", "")
@@ -356,6 +360,7 @@ def _fetch_usdc_balance() -> float | None:
     passphrase = os.getenv("POLYMARKET_PASSPHRASE", "")
     # POLY_ADDRESS must be the EOA (signer) address, not the proxy wallet address.
     address = os.getenv("POLYMARKET_SIGNER_ADDRESS") or os.getenv("POLYMARKET_ADDRESS", "")
+    signature_type = int(os.getenv("POLYMARKET_SIGNATURE_TYPE", "1"))
 
     if not api_key or not secret_b64 or not passphrase or not address:
         LOGGER.debug(
@@ -388,7 +393,7 @@ def _fetch_usdc_balance() -> float | None:
     try:
         resp = requests.get(
             f"{base_url}{path}",
-            params={"asset_type": "COLLATERAL"},
+            params={"asset_type": "COLLATERAL", "signature_type": signature_type},
             headers=headers,
             timeout=10,
         )
@@ -402,12 +407,18 @@ def _fetch_usdc_balance() -> float | None:
 
     if not isinstance(payload, dict):
         return None
-    # Flat dict: {"USDC": "10.5"} or {"collateral": "10.5"} etc.
+
+    _USDC_DECIMALS = 1_000_000  # USDC uses 6 decimal places on Polygon
+
+    # Flat dict: {"balance": "9483019"} — raw USDC units, divide by 1e6
     for key in ("USDC", "usdc", "collateral", "free", "available", "balance"):
         val = payload.get(key)
         if val is not None:
             try:
-                return float(val)
+                raw = float(val)
+                # Values >= 1000 are almost certainly raw on-chain units (micro-USDC);
+                # small values (e.g. from a mock or already-converted response) are used as-is.
+                return raw / _USDC_DECIMALS if raw >= 1000 else raw
             except (TypeError, ValueError):
                 continue
     # Nested list: {"balances": [{"asset": "USDC", "balance": "10.5"}]}
