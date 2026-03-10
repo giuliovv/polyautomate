@@ -1,0 +1,201 @@
+slug,question,tags,end_date,n_trades,win_rate,total_pnl,sharpe,avg_spread,exit_reasons,error,skipped
+cs2-bca-am-2026-03-10-map-handicap-away-1pt5,Map Handicap: BCA (-1.5) vs AM Gaming (+1.5),,2026-03-10T22:15:00+00:00,0,0.0000,0.000000,0.0000,0.5250,{},,spread=0.525>0.030
+cbb-bayl-arzst-2026-03-10-spread-away-5pt5,Spread: Baylor Bears (-5.5),,2026-03-10T16:30:00+00:00,0,0.0000,0.000000,0.0000,0.0000,{},"No price data for token label 'Arizona State Sun Devils' in market 'cbb-bayl-arzst-2026-03-10-spread-away-5pt5'. Available labels: ['Arizona State Sun Devils', 'Baylor Bears']",
+cs2-bca-am-2026-03-10-game2-odd-even-total-rounds,Map 2: Odd/Even Total Rounds?,,2026-03-10T22:15:00+00:00,0,0.0000,0.000000,0.0000,0.5148,{},,spread=0.515>0.030
+cs2-bca-am-2026-03-10-game1-odd-even-total-rounds,Map 1: Odd/Even Total Rounds?,,2026-03-10T22:15:00+00:00,0,0.0000,0.000000,0.0000,0.4356,{},,spread=0.436>0.030
+cs2-bca-am-2026-03-10-map-handicap-home-1pt5,Map Handicap: AM (-1.5) vs Betclic Apogee Esports (+1.5),,2026-03-10T22:15:00+00:00,0,0.0000,0.000000,0.0000,0.3098,{},,spread=0.310>0.030
+cs2-bca-am-2026-03-10-total-games-2pt5,Games Total: O/U 2.5,,2026-03-10T22:15:00+00:00,0,0.0000,0.000000,0.0000,0.5165,{},,spread=0.517>0.030
+cs2-bca-am-2026-03-10-game2,Counter-Strike: Betclic Apogee Esports vs AM Gaming - Map 2 Winner,,2026-03-10T22:15:00+00:00,0,0.0000,0.000000,0.0000,0.3374,{},,spread=0.337>0.030
+cs2-bca-am-2026-03-10-game1,Counter-Strike: Betclic Apogee Esports vs AM Gaming - Map 1 Winner,,2026-03-10T22:15:00+00:00,0,0.0000,0.000000,0.0000,0.2088,{},,spread=0.209>0.030
+cs2-bca-am-2026-03-10,Counter-Strike: Betclic Apogee Esports vs AM Gaming (BO3) - Parken Challenger Ch,,2026-03-10T22:15:00+00:00,0,0.0000,0.000000,0.0000,0.1438,{},,spread=0.144>0.030
+dota2-heroic-navi-2026-03-10-game1-kill-over-34pt5,Total Kills Over/Under 34.5 in Game 1?,,2026-03-10T21:00:00+00:00,0,0.0000,0.000000,0.0000,0.1504,{},,spread=0.150>0.030
+dota2-heroic-navi-2026-03-10-game1-kill-over-35pt5,Total Kills Over/Under 35.5 in Game 1?,,2026-03-10T21:00:00+00:00,0,0.0000,0.000000,0.0000,0.1507,{},,spread=0.151>0.030
+cs2-kol-leo2-2026-03-10-map-handicap-home-1pt5,Map Handicap: Leo (-1.5) vs KOLESIE (+1.5),,2026-03-10T21:25:00+00:00,0,0.0000,0.000000,0.0000,0.3129,{},,spread=0.313>0.030
+cbb-bayl-arzst-2026-03-10-total-152pt5,Baylor Bears vs. Arizona State Sun Devils: O/U 152.5,,2026-03-10T16:30:00+00:00,0,0.0000,0.000000,0.0000,0.0000,{},"No price data for token label 'Over' in market 'cbb-bayl-arzst-2026-03-10-total-152pt5'. Available labels: ['Over', 'Under']",
+cs2-lk-ww-2026-03-10-total-games-2pt5,Games Total: O/U 2.5,,2026-03-10T21:00:00+00:00,0,0.0000,0.000000,0.0000,0.3170,{},,spread=0.317>0.030
+cs2-lk-ww-2026-03-10,Counter-Strike: los kogutos vs WW Team (BO3) - BC Game Masters Group Stage,,2026-03-10T21:00:00+00:00,0,0.0000,0.000000,0.0000,0.2519,{},,spread=0.252>0.030
+dota2-tundra-og-2026-03-10-game-handicap-home-1pt5,Game Handicap: OG (-1.5) vs Tundra Esports (+1.5),,2026-03-10T19:30:00+00:00,0,0.0000,0.000000,0.0000,0.5384,{},,spread=0.538>0.030
+cwbb-yngst-gb-2026-03-10,Youngstown State Penguins vs. Green Bay Phoenix (W),,2026-03-10T16:00:00+00:00,0,0.0000,0.000000,0.0000,0.0000,{},"No price data for token label 'Green Bay Phoenix' in market 'cwbb-yngst-gb-2026-03-10'. Available labels: ['Green Bay Phoenix', 'Youngstown State Penguins']",
+cbb-bayl-arzst-2026-03-10-total-153pt5,Baylor Bears vs. Arizona State Sun Devils: O/U 153.5,,2026-03-10T16:30:00+00:00,0,0.0000,0.000000,0.0000,0.0298,{},,
+cbb-bayl-arzst-2026-03-10-spread-away-4pt5,Spread: Baylor Bears (-4.5),,2026-03-10T16:30:00+00:00,0,0.0000,0.000000,0.0000,0.0565,{},,spread=0.056>0.030
+cs2-kol-leo2-2026-03-10-game3-odd-even-total-rounds,Map 3: Odd/Even Total Rounds?,,2026-03-10T21:25:00+00:00,0,0.0000,0.000000,0.0000,0.6841,{},,spread=0.684>0.030
+cs2-kol-leo2-2026-03-10-map-handicap-away-1pt5,Map Handicap: KOL (-1.5) vs Leo Team (+1.5),,2026-03-10T21:25:00+00:00,0,0.0000,0.000000,0.0000,0.5203,{},,spread=0.520>0.030
+cs2-kol-leo2-2026-03-10-total-games-2pt5,Games Total: O/U 2.5,,2026-03-10T21:25:00+00:00,0,0.0000,0.000000,0.0000,0.5288,{},,spread=0.529>0.030
+cs2-kol-leo2-2026-03-10,Counter-Strike: KOLESIE vs Leo Team (BO3) - CCT Europe Series #17 Playoffs,,2026-03-10T21:25:00+00:00,0,0.0000,0.000000,0.0000,0.3052,{},,spread=0.305>0.030
+lol-ap-cg-2026-03-10-game-handicap-away-1pt5,Game Handicap: AP (-1.5) vs Colossal Gaming (+1.5),,2026-03-10T22:00:00+00:00,0,0.0000,0.000000,0.0000,0.3243,{},,spread=0.324>0.030
+lol-ap-cg-2026-03-10-total-games-2pt5,Games Total: O/U 2.5,,2026-03-10T22:00:00+00:00,0,0.0000,0.000000,0.0000,0.2124,{},,spread=0.212>0.030
+lol-ap-cg-2026-03-10-game2,LoL: Arctic Pandas vs Colossal Gaming - Game 2 Winner,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.2565,{},,spread=0.256>0.030
+lol-ap-cg-2026-03-10-game1,LoL: Arctic Pandas vs Colossal Gaming - Game 1 Winner,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.2804,{},,spread=0.280>0.030
+lol-ap-cg-2026-03-10,LoL: Arctic Pandas vs Colossal Gaming (BO3) - EMEA Masters Group 3,,2026-03-10T22:00:00+00:00,0,0.0000,0.000000,0.0000,0.1413,{},,spread=0.141>0.030
+lol-ucam1-bw-2026-03-10-game2-odd-even-total-kills,Game 2: Odd/Even Total Kills?,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.9056,{},,spread=0.906>0.030
+lol-ucam1-bw-2026-03-10-game2-any-player-penta-kill,Game 2: Any Player Penta Kill?,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.9166,{},,spread=0.917>0.030
+lol-ucam1-bw-2026-03-10-game2-any-player-quadra-kill,Game 2: Any Player Quadra Kill?,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.9216,{},,spread=0.922>0.030
+lol-ucam1-bw-2026-03-10-game2-both-teams-destroy-inhibitors,Game 2: Both Teams Destroy Inhibitors?,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.9207,{},,spread=0.921>0.030
+lol-ucam1-bw-2026-03-10-game2-both-teams-slay-dragon,Game 2: Both Teams Slay a Dragon?,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.9198,{},,spread=0.920>0.030
+lol-ucam1-bw-2026-03-10-game2-both-teams-slay-baron,Game 2: Both Teams Slay Baron Nashor?,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.9171,{},,spread=0.917>0.030
+lol-ucam1-bw-2026-03-10-game1-odd-even-total-kills,Game 1: Odd/Even Total Kills?,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.8533,{},,spread=0.853>0.030
+lol-ucam1-bw-2026-03-10-game1-any-player-penta-kill,Game 1: Any Player Penta Kill?,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.9147,{},,spread=0.915>0.030
+lol-ucam1-bw-2026-03-10-game1-any-player-quadra-kill,Game 1: Any Player Quadra Kill?,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.9172,{},,spread=0.917>0.030
+lol-ucam1-bw-2026-03-10-game1-both-teams-destroy-inhibitors,Game 1: Both Teams Destroy Inhibitors?,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.8983,{},,spread=0.898>0.030
+lol-ucam1-bw-2026-03-10-game1-both-teams-slay-dragon,Game 1: Both Teams Slay a Dragon?,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.8728,{},,spread=0.873>0.030
+lol-ucam1-bw-2026-03-10-game1-both-teams-slay-baron,Game 1: Both Teams Slay Baron Nashor?,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.8758,{},,spread=0.876>0.030
+lol-ucam1-bw-2026-03-10-game-handicap-away-1pt5,Game Handicap: UCAM (-1.5) vs Bushido Wildcats (+1.5),,2026-03-10T22:00:00+00:00,0,0.0000,0.000000,0.0000,0.3647,{},,spread=0.365>0.030
+lol-ucam1-bw-2026-03-10-total-games-2pt5,Games Total: O/U 2.5,,2026-03-10T22:00:00+00:00,0,0.0000,0.000000,0.0000,0.2294,{},,spread=0.229>0.030
+lol-ucam1-bw-2026-03-10-game2,LoL: UCAM Esports Club vs Bushido Wildcats - Game 2 Winner,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.2902,{},,spread=0.290>0.030
+lol-ucam1-bw-2026-03-10-game1,LoL: UCAM Esports Club vs Bushido Wildcats - Game 1 Winner,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.2908,{},,spread=0.291>0.030
+lol-ucam1-bw-2026-03-10,LoL: UCAM Esports Club vs Bushido Wildcats (BO3) - EMEA Masters Group 2,,2026-03-10T22:00:00+00:00,0,0.0000,0.000000,0.0000,0.1108,{},,spread=0.111>0.030
+lol-dmg-kcb-2026-03-10-game2-both-teams-slay-dragon,Game 2: Both Teams Slay a Dragon?,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.9141,{},,spread=0.914>0.030
+lol-dmg-kcb-2026-03-10-game-handicap-home-1pt5,Game Handicap: KCB (-1.5) vs DMG Esports (+1.5),,2026-03-10T22:00:00+00:00,0,0.0000,0.000000,0.0000,0.3826,{},,spread=0.383>0.030
+lol-dmg-kcb-2026-03-10-total-games-2pt5,Games Total: O/U 2.5,,2026-03-10T22:00:00+00:00,0,0.0000,0.000000,0.0000,0.3447,{},,spread=0.345>0.030
+lol-dmg-kcb-2026-03-10-game2,LoL: DMG Esports vs Karmine Corp Blue - Game 2 Winner,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.4414,{},,spread=0.441>0.030
+lol-dmg-kcb-2026-03-10-game1,LoL: DMG Esports vs Karmine Corp Blue - Game 1 Winner,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.4285,{},,spread=0.428>0.030
+lol-dmg-kcb-2026-03-10,LoL: DMG Esports vs Karmine Corp Blue (BO3) - EMEA Masters Group 1,,2026-03-10T22:00:00+00:00,0,0.0000,0.000000,0.0000,0.1654,{},,spread=0.165>0.030
+lol-bar-brt-2026-03-10-game-handicap-away-1pt5,Game Handicap: BAR (-1.5) vs BRUTE (+1.5),,2026-03-10T22:00:00+00:00,0,0.0000,0.000000,0.0000,0.4028,{},,spread=0.403>0.030
+lol-bar-brt-2026-03-10-total-games-2pt5,Games Total: O/U 2.5,,2026-03-10T22:00:00+00:00,0,0.0000,0.000000,0.0000,0.3659,{},,spread=0.366>0.030
+lol-bar-brt-2026-03-10-game2,LoL: Barça eSports vs BRUTE - Game 2 Winner,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.3819,{},,spread=0.382>0.030
+lol-bar-brt-2026-03-10-game1,LoL: Barça eSports vs BRUTE - Game 1 Winner,,2026-03-10T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.3629,{},,spread=0.363>0.030
+lol-bar-brt-2026-03-10,LoL: Barça eSports vs BRUTE (BO3) - EMEA Masters Group 1,,2026-03-10T22:00:00+00:00,0,0.0000,0.000000,0.0000,0.2381,{},,spread=0.238>0.030
+cbb-bayl-arzst-2026-03-10-total-154pt5,Baylor Bears vs. Arizona State Sun Devils: O/U 154.5,,2026-03-10T16:30:00+00:00,0,0.0000,0.000000,0.0000,0.0325,{},,spread=0.033>0.030
+cbb-bayl-arzst-2026-03-10-spread-away-3pt5,Spread: Baylor Bears (-3.5),,2026-03-10T16:30:00+00:00,0,0.0000,0.000000,0.0000,0.0245,{},,
+cs2-g2-fut-2026-03-10-map-handicap-away-1pt5,Map Handicap: G2 (-1.5) vs FUT Esports (+1.5),,2026-03-10T21:45:00+00:00,0,0.0000,0.000000,0.0000,0.1987,{},,spread=0.199>0.030
+dota2-xtreme-aur1-2026-03-10-game2-kill-over-44pt5,Total Kills Over/Under 44.5 in Game 2?,,2026-03-10T17:55:00+00:00,0,0.0000,0.000000,0.0000,0.7661,{},,spread=0.766>0.030
+dota2-xtreme-aur1-2026-03-10-game2-kill-over-45pt5,Total Kills Over/Under 45.5 in Game 2?,,2026-03-10T17:55:00+00:00,0,0.0000,0.000000,0.0000,0.7647,{},,spread=0.765>0.030
+dota2-xtreme-aur1-2026-03-10-game2-first-blood,First Blood in Game 2?,,2026-03-10T17:55:00+00:00,0,0.0000,0.000000,0.0000,0.7489,{},,spread=0.749>0.030
+dota2-heroic-navi-2026-03-10-game1-first-blood,First Blood in Game 1?,,2026-03-10T21:00:00+00:00,0,0.0000,0.000000,0.0000,0.4227,{},,spread=0.423>0.030
+dota2-heroic-navi-2026-03-10-game2-kill-over-48pt5,Total Kills Over/Under 48.5 in Game 2?,,2026-03-10T21:00:00+00:00,0,0.0000,0.000000,0.0000,0.5013,{},,spread=0.501>0.030
+dota2-heroic-navi-2026-03-10-game2-kill-over-47pt5,Total Kills Over/Under 47.5 in Game 2?,,2026-03-10T21:00:00+00:00,0,0.0000,0.000000,0.0000,0.6472,{},,spread=0.647>0.030
+dota2-heroic-navi-2026-03-10-game2-first-blood,First Blood in Game 2?,,2026-03-10T21:00:00+00:00,0,0.0000,0.000000,0.0000,0.4293,{},,spread=0.429>0.030
+dota2-heroic-navi-2026-03-10-game-handicap-away-1pt5,Game Handicap: HEROIC (-1.5) vs Natus Vincere (+1.5),,2026-03-10T21:00:00+00:00,0,0.0000,0.000000,0.0000,0.4070,{},,spread=0.407>0.030
+cs2-g2-fut-2026-03-10-game3-odd-even-total-rounds,Map 3: Odd/Even Total Rounds?,,2026-03-10T21:45:00+00:00,0,0.0000,0.000000,0.0000,0.8058,{},,spread=0.806>0.030
+cs2-g2-fut-2026-03-10-map-handicap-home-1pt5,Map Handicap: FUT (-1.5) vs G2 (+1.5),,2026-03-10T21:45:00+00:00,0,0.0000,0.000000,0.0000,0.3622,{},,spread=0.362>0.030
+cs2-g2-fut-2026-03-10-total-games-2pt5,Games Total: O/U 2.5,,2026-03-10T21:45:00+00:00,0,0.0000,0.000000,0.0000,0.1568,{},,spread=0.157>0.030
+cs2-g2-fut-2026-03-10,Counter-Strike: G2 vs FUT Esports (BO3) - ESL Pro League Stage 2,,2026-03-10T21:45:00+00:00,0,0.0000,0.000000,0.0000,0.0428,{},,spread=0.043>0.030
+dota2-tundra-og-2026-03-10-game-handicap-away-1pt5,Game Handicap: Tundra (-1.5) vs OG (+1.5),,2026-03-10T19:30:00+00:00,0,0.0000,0.000000,0.0000,0.2997,{},,spread=0.300>0.030
+dota2-tundra-og-2026-03-10-total-games-2pt5,Games Total: O/U 2.5,,2026-03-10T19:30:00+00:00,0,0.0000,0.000000,0.0000,0.2332,{},,spread=0.233>0.030
+dota2-tundra-og-2026-03-10,Dota 2: Tundra Esports vs OG (BO3) - PGL Wallachia Group Stage,,2026-03-10T19:30:00+00:00,0,0.0000,0.000000,0.0000,0.0577,{},,spread=0.058>0.030
+dota2-heroic-navi-2026-03-10-game2-ends-in-daytime,Game 2: Ends in Daytime?,,2026-03-10T21:00:00+00:00,0,0.0000,0.000000,0.0000,0.7517,{},,spread=0.752>0.030
+dota2-heroic-navi-2026-03-10-game1-ends-in-daytime,Game 1: Ends in Daytime?,,2026-03-10T21:00:00+00:00,0,0.0000,0.000000,0.0000,0.8234,{},,spread=0.823>0.030
+dota2-heroic-navi-2026-03-10-game-handicap-home-1pt5,Game Handicap: Na`Vi (-1.5) vs Heroic (+1.5),,2026-03-10T21:00:00+00:00,0,0.0000,0.000000,0.0000,0.2244,{},,spread=0.224>0.030
+dota2-heroic-navi-2026-03-10-total-games-2pt5,Games Total: O/U 2.5,,2026-03-10T21:00:00+00:00,0,0.0000,0.000000,0.0000,0.1988,{},,spread=0.199>0.030
+dota2-heroic-navi-2026-03-10,Dota 2: Heroic vs Natus Vincere (BO3) - PGL Wallachia Group Stage,,2026-03-10T21:00:00+00:00,0,0.0000,0.000000,0.0000,0.0520,{},,spread=0.052>0.030
+dota2-xtreme-aur1-2026-03-10-game3-ends-in-daytime,Game 3: Ends in Daytime?,,2026-03-10T17:55:00+00:00,0,0.0000,0.000000,0.0000,0.9132,{},,spread=0.913>0.030
+dota2-xtreme-aur1-2026-03-10-game2-both-teams-beat-roshan,Game 2: Both Teams Beat Roshan?,,2026-03-10T17:55:00+00:00,0,0.0000,0.000000,0.0000,0.9140,{},,spread=0.914>0.030
+dota2-xtreme-aur1-2026-03-10-game2-ends-in-daytime,Game 2: Ends in Daytime?,,2026-03-10T17:55:00+00:00,0,0.0000,0.000000,0.0000,0.9133,{},,spread=0.913>0.030
+dota2-xtreme-aur1-2026-03-10-game1-both-teams-beat-roshan,Game 1: Both Teams Beat Roshan?,,2026-03-10T17:55:00+00:00,0,0.0000,0.000000,0.0000,0.9128,{},,spread=0.913>0.030
+dota2-xtreme-aur1-2026-03-10-game1-ends-in-daytime,Game 1: Ends in Daytime?,,2026-03-10T17:55:00+00:00,0,0.0000,0.000000,0.0000,0.9145,{},,spread=0.915>0.030
+dota2-pari-ty-2026-03-10-game2-both-teams-destroy-barracks,Game 2: Both Teams Destroy Barracks?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.9275,{},,spread=0.928>0.030
+dota2-pari-ty-2026-03-10-game1-both-teams-destroy-barracks,Game 1: Both Teams Destroy Barracks?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.9007,{},,spread=0.901>0.030
+btc-updown-5m-1773177000,"Bitcoin Up or Down - March 10, 5:10PM-5:15PM ET",,2026-03-10T21:15:00+00:00,0,0.0000,0.000000,0.0000,0.0102,{},,
+sol-updown-5m-1773177000,"Solana Up or Down - March 10, 5:10PM-5:15PM ET",,2026-03-10T21:15:00+00:00,0,0.0000,0.000000,0.0000,0.0189,{},,
+eth-updown-5m-1773177000,"Ethereum Up or Down - March 10, 5:10PM-5:15PM ET",,2026-03-10T21:15:00+00:00,0,0.0000,0.000000,0.0000,0.0200,{},,
+xrp-updown-5m-1773177000,"XRP Up or Down - March 10, 5:10PM-5:15PM ET",,2026-03-10T21:15:00+00:00,0,0.0000,0.000000,0.0000,0.0237,{},,
+btc-updown-15m-1773176400,"Bitcoin Up or Down - March 10, 5:00PM-5:15PM ET",,2026-03-10T21:15:00+00:00,0,0.0000,0.000000,0.0000,0.0159,{},,
+sol-updown-15m-1773176400,"Solana Up or Down - March 10, 5:00PM-5:15PM ET",,2026-03-10T21:15:00+00:00,0,0.0000,0.000000,0.0000,0.0200,{},,
+eth-updown-15m-1773176400,"Ethereum Up or Down - March 10, 5:00PM-5:15PM ET",,2026-03-10T21:15:00+00:00,0,0.0000,0.000000,0.0000,0.0235,{},,
+cwbb-nwst-utrgv-2026-03-10,Northwestern State Demons vs. Texas-Rio Grande Valley Vaqueros (W),,2026-03-10T16:00:00+00:00,0,0.0000,0.000000,0.0000,0.6423,{},,spread=0.642>0.030
+cwbb-bcook-flam-2026-03-10,Bethune-Cookman Wildcats vs. Florida A&M Rattlers (W),,2026-03-10T15:00:00+00:00,0,0.0000,0.000000,0.0000,0.6331,{},,spread=0.633>0.030
+cs2-hashir-nvq-2026-03-10-map-handicap-home-1pt5,Map Handicap: NVQ (-1.5) vs Hashiras (+1.5),,2026-03-10T21:10:00+00:00,0,0.0000,0.000000,0.0000,0.4539,{},,spread=0.454>0.030
+cs2-hashir-nvq-2026-03-10-game2,Counter-Strike: Hashiras vs Team Novaq - Map 2 Winner,,2026-03-10T21:10:00+00:00,0,0.0000,0.000000,0.0000,0.3020,{},,spread=0.302>0.030
+cs2-hashir-nvq-2026-03-10-game1,Counter-Strike: Hashiras vs Team Novaq - Map 1 Winner,,2026-03-10T21:10:00+00:00,0,0.0000,0.000000,0.0000,0.2787,{},,spread=0.279>0.030
+cs2-hashir-nvq-2026-03-10,Counter-Strike: Hashiras vs Team Novaq (BO3) - NODWIN Clutch Series Play-In Grou,,2026-03-10T21:10:00+00:00,0,0.0000,0.000000,0.0000,0.2195,{},,spread=0.220>0.030
+sol-updown-15m-1773173700,"Solana Up or Down - March 10, 4:15PM-4:30PM ET",,2026-03-10T20:30:00+00:00,0,0.0000,0.000000,0.0000,0.0236,{},,
+eth-updown-15m-1773173700,"Ethereum Up or Down - March 10, 4:15PM-4:30PM ET",,2026-03-10T20:30:00+00:00,0,0.0000,0.000000,0.0000,0.0236,{},,
+highest-temperature-in-lucknow-on-march-10-2026-42corhigher,Will the highest temperature in Lucknow be 42°C or higher on March 10?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.1631,{},,spread=0.163>0.030
+highest-temperature-in-lucknow-on-march-10-2026-41c,Will the highest temperature in Lucknow be 41°C on March 10?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.1379,{},,spread=0.138>0.030
+highest-temperature-in-lucknow-on-march-10-2026-40c,Will the highest temperature in Lucknow be 40°C on March 10?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.1394,{},,spread=0.139>0.030
+highest-temperature-in-lucknow-on-march-10-2026-39c,Will the highest temperature in Lucknow be 39°C on March 10?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.1475,{},,spread=0.148>0.030
+highest-temperature-in-lucknow-on-march-10-2026-38c,Will the highest temperature in Lucknow be 38°C on March 10?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.1428,{},,spread=0.143>0.030
+highest-temperature-in-lucknow-on-march-10-2026-37c,Will the highest temperature in Lucknow be 37°C on March 10?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.1418,{},,spread=0.142>0.030
+highest-temperature-in-lucknow-on-march-10-2026-36c,Will the highest temperature in Lucknow be 36°C on March 10?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.1465,{},,spread=0.147>0.030
+highest-temperature-in-lucknow-on-march-10-2026-35c,Will the highest temperature in Lucknow be 35°C on March 10?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.1779,{},,spread=0.178>0.030
+highest-temperature-in-lucknow-on-march-10-2026-34corbelow,Will the highest temperature in Lucknow be 34°C or below on March 10?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.2839,{},,spread=0.284>0.030
+highest-temperature-in-atlanta-on-march-10-2026-76-77f,Will the highest temperature in Atlanta be between 76-77°F on March 10?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.1255,{},,spread=0.126>0.030
+highest-temperature-in-atlanta-on-march-10-2026-74-75f,Will the highest temperature in Atlanta be between 74-75°F on March 10?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.0897,{},,spread=0.090>0.030
+highest-temperature-in-atlanta-on-march-10-2026-72-73f,Will the highest temperature in Atlanta be between 72-73°F on March 10?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.0824,{},,spread=0.082>0.030
+highest-temperature-in-dallas-on-march-10-2026-76-77f,Will the highest temperature in Dallas be between 76-77°F on March 10?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.1201,{},,spread=0.120>0.030
+highest-temperature-in-dallas-on-march-10-2026-74-75f,Will the highest temperature in Dallas be between 74-75°F on March 10?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.1142,{},,spread=0.114>0.030
+highest-temperature-in-seattle-on-march-10-2026-40-41f,Will the highest temperature in Seattle be between 40-41°F on March 10?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.1076,{},,spread=0.108>0.030
+highest-temperature-in-seattle-on-march-10-2026-38-39f,Will the highest temperature in Seattle be between 38-39°F on March 10?,,2026-03-10T12:00:00+00:00,0,0.0000,0.000000,0.0000,0.0811,{},,spread=0.081>0.030
+cwbb-kenest-del-2026-03-10,Kennesaw State Owls vs. Delaware Fightin' Blue Hens (W),,2026-03-10T16:30:00+00:00,0,0.0000,0.000000,0.0000,0.5510,{},,spread=0.551>0.030
+will-mrbeasts-next-video-get-less-than-46-million-views-on-day-3,Will MrBeast's next video get less than 46 million views on day 3?,,2026-03-08T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0000,{},"No price data for token label 'Yes' in market 'will-mrbeasts-next-video-get-less-than-46-million-views-on-day-3'. Available labels: ['No', 'Yes']",
+cbb-bayl-arzst-2026-03-10,Baylor Bears vs. Arizona State Sun Devils,,2026-03-10T16:30:00+00:00,0,0.0000,0.000000,0.0000,0.1581,{},,spread=0.158>0.030
+bnb-up-or-down-march-10-2pm-et,"BNB Up or Down - March 10, 2PM ET",,2026-03-10T19:00:00+00:00,0,0.0000,0.000000,0.0000,0.0205,{},,
+hype-up-or-down-march-10-2pm-et,"HYPE Up or Down - March 10, 2PM ET",,2026-03-10T19:00:00+00:00,0,0.0000,0.000000,0.0000,0.8967,{},,spread=0.897>0.030
+xrp-up-or-down-march-10-2pm-et,"XRP Up or Down - March 10, 2PM ET",,2026-03-10T19:00:00+00:00,0,0.0000,0.000000,0.0000,0.0200,{},,
+solana-up-or-down-march-10-2pm-et,"Solana Up or Down - March 10, 2PM ET",,2026-03-10T19:00:00+00:00,0,0.0000,0.000000,0.0000,0.0200,{},,
+ethereum-up-or-down-march-10-2pm-et,"Ethereum Up or Down - March 10, 2PM ET",,2026-03-10T19:00:00+00:00,0,0.0000,0.000000,0.0000,0.0198,{},,
+bitcoin-up-or-down-march-10-2pm-et,"Bitcoin Up or Down - March 10, 2PM ET",,2026-03-10T19:00:00+00:00,0,0.0000,0.000000,0.0000,0.0189,{},,
+bnb-up-or-down-march-10-1pm-et,"BNB Up or Down - March 10, 1PM ET",,2026-03-10T18:00:00+00:00,0,0.0000,0.000000,0.0000,0.0206,{},,
+hype-up-or-down-march-10-1pm-et,"HYPE Up or Down - March 10, 1PM ET",,2026-03-10T18:00:00+00:00,0,0.0000,0.000000,0.0000,0.8932,{},,spread=0.893>0.030
+xrp-up-or-down-march-10-1pm-et,"XRP Up or Down - March 10, 1PM ET",,2026-03-10T18:00:00+00:00,0,0.0000,0.000000,0.0000,0.0200,{},,
+solana-up-or-down-march-10-1pm-et,"Solana Up or Down - March 10, 1PM ET",,2026-03-10T18:00:00+00:00,0,0.0000,0.000000,0.0000,0.0200,{},,
+ethereum-up-or-down-march-10-1pm-et,"Ethereum Up or Down - March 10, 1PM ET",,2026-03-10T18:00:00+00:00,0,0.0000,0.000000,0.0000,0.0190,{},,
+bitcoin-up-or-down-march-10-1pm-et,"Bitcoin Up or Down - March 10, 1PM ET",,2026-03-10T18:00:00+00:00,0,0.0000,0.000000,0.0000,0.0197,{},,
+khl-csk-hcs-2026-03-10,KHL: CSKA Moscow vs. HC Sochi,,2026-03-10T16:30:00+00:00,0,0.0000,0.000000,0.0000,0.4594,{},,spread=0.459>0.030
+khl-nef-tra-2026-03-10,KHL: Neftekhimik Nizhnekamsk vs. Traktor,,2026-03-10T16:00:00+00:00,0,0.0000,0.000000,0.0000,0.3924,{},,spread=0.392>0.030
+khl-akb-spa-2026-03-10,KHL: Ak Bars Kazan vs. Spartak Moscow,,2026-03-10T16:30:00+00:00,0,0.0000,0.000000,0.0000,0.3584,{},,spread=0.358>0.030
+will-vladimir-be-the-2-us-netflix-show-this-week,"Will ""Vladimir"" be the #2 US Netflix show this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.2559,{},,spread=0.256>0.030
+will-blue-therapy-be-the-2-us-netflix-show-this-week,"Will ""Blue Therapy"" be the #2 US Netflix show this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.2613,{},,spread=0.261>0.030
+will-the-night-agent-season-3-be-the-2-us-netflix-show-this-week-211,"Will ""The Night Agent: Season 3"" be the #2 US Netflix show this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.2804,{},,spread=0.280>0.030
+will-the-dinosaurs-be-the-top-us-netflix-show-this-week,"Will ""The Dinosaurs"" be the top US Netflix show this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.1577,{},,spread=0.158>0.030
+will-vladimir-be-the-top-us-netflix-show-this-week,"Will ""Vladimir"" be the top US Netflix show this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.1349,{},,spread=0.135>0.030
+will-blue-therapy-be-the-top-us-netflix-show-this-week,"Will ""Blue Therapy"" be the top US Netflix show this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.1140,{},,spread=0.114>0.030
+will-bridgerton-season-4-be-the-top-us-netflix-show-this-week-271,"Will ""Bridgerton: Season 4"" be the top US Netflix show this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.1478,{},,spread=0.148>0.030
+will-gabbys-dollhouse-season-13-be-the-2-global-netflix-show-this-week,"Will ""Gabby's Dollhouse: Season 13"" be the #2 global Netflix show this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.1815,{},,spread=0.182>0.030
+will-the-dinosaurs-be-the-2-global-netflix-show-this-week,"Will ""The Dinosaurs"" be the #2 global Netflix show this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.3683,{},,spread=0.368>0.030
+will-blue-therapy-be-the-2-global-netflix-show-this-week,"Will ""Blue Therapy"" be the #2 global Netflix show this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.1477,{},,spread=0.148>0.030
+will-the-night-agent-season-3-be-the-2-global-netflix-show-this-week-252,"Will ""The Night Agent: Season 3"" be the #2 global Netflix show this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.3081,{},,spread=0.308>0.030
+will-bridgerton-season-4-be-the-2-global-netflix-show-this-week-312,"Will ""Bridgerton: Season 4"" be the #2 global Netflix show this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.3368,{},,spread=0.337>0.030
+will-gabbys-dollhouse-season-13-be-the-top-global-netflix-show-this-week,"Will ""Gabby's Dollhouse: Season 13"" be the top global Netflix show this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0695,{},,spread=0.069>0.030
+will-vladimir-be-the-top-global-netflix-show-this-week,"Will ""Vladimir"" be the top global Netflix show this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0731,{},,spread=0.073>0.030
+will-bridgerton-season-4-be-the-top-global-netflix-show-this-week-577,"Will ""Bridgerton: Season 4"" be the top global Netflix show this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0778,{},,spread=0.078>0.030
+will-nuremberg-be-the-2-us-netflix-movie-this-week,"Will ""Nuremberg"" be the #2 US Netflix movie this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.1212,{},,spread=0.121>0.030
+will-downton-abbey-the-grand-finale-be-the-2-us-netflix-movie-this-week,"Will ""Downton Abbey: The Grand Finale"" be the #2 US Netflix movie this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.1878,{},,spread=0.188>0.030
+will-kpop-demon-hunters-be-the-2-us-netflix-movie-this-week-499,"Will ""Kpop Demon Hunters"" be the #2 US Netflix movie this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.1035,{},,spread=0.104>0.030
+will-the-addams-family-be-the-2-us-netflix-movie-this-week-594,"Will ""The Addams Family"" be the #2 US Netflix movie this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0609,{},,spread=0.061>0.030
+will-downton-abbey-the-grand-finale-be-the-top-us-netflix-movie-this-week,"Will ""Downton Abbey: The Grand Finale"" be the top US Netflix movie this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0611,{},,spread=0.061>0.030
+will-kpop-demon-hunters-be-the-top-us-netflix-movie-this-week-255,"Will ""Kpop Demon Hunters"" be the top US Netflix movie this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0436,{},,spread=0.044>0.030
+will-the-addams-family-be-the-top-us-netflix-movie-this-week-336,"Will ""The Addams Family"" be the top US Netflix movie this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0449,{},,spread=0.045>0.030
+will-the-addams-family-be-the-2-global-netflix-movie-this-week-527,"Will ""The Addams Family"" be the #2 global Netflix movie this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.1059,{},,spread=0.106>0.030
+will-nuremberg-be-the-top-global-netflix-movie-this-week,"Will ""Nuremberg"" be the top global Netflix movie this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0854,{},,spread=0.085>0.030
+will-the-addams-family-be-the-top-global-netflix-movie-this-week-234,"Will ""The Addams Family"" be the top global Netflix movie this week?",,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0288,{},,
+iranhezbollah-strike-on-cyprus-by-march-7,Iran/Hezbollah strike on Cyprus by March 7?,,2026-03-07T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0762,{},,spread=0.076>0.030
+elon-musk-of-tweets-march-3-march-10-580plus,"Will Elon Musk post 580+ tweets from March 3 to March 10, 2026?",,2026-03-10T16:00:00+00:00,0,0.0000,0.000000,0.0000,0.0056,{},,
+elon-musk-of-tweets-march-3-march-10-560-579,"Will Elon Musk post 560-579 tweets from March 3 to March 10, 2026?",,2026-03-10T16:00:00+00:00,0,0.0000,0.000000,0.0000,0.0060,{},,
+elon-musk-of-tweets-march-3-march-10-540-559,"Will Elon Musk post 540-559 tweets from March 3 to March 10, 2026?",,2026-03-10T16:00:00+00:00,0,0.0000,0.000000,0.0000,0.0056,{},,
+elon-musk-of-tweets-march-3-march-10-520-539,"Will Elon Musk post 520-539 tweets from March 3 to March 10, 2026?",,2026-03-10T16:00:00+00:00,0,0.0000,0.000000,0.0000,0.0057,{},,
+elon-musk-of-tweets-march-3-march-10-500-519,"Will Elon Musk post 500-519 tweets from March 3 to March 10, 2026?",,2026-03-10T16:00:00+00:00,0,0.0000,0.000000,0.0000,0.0056,{},,
+elon-musk-of-tweets-march-3-march-10-480-499,"Will Elon Musk post 480-499 tweets from March 3 to March 10, 2026?",,2026-03-10T16:00:00+00:00,0,0.0000,0.000000,0.0000,0.0056,{},,
+elon-musk-of-tweets-march-3-march-10-460-479,"Will Elon Musk post 460-479 tweets from March 3 to March 10, 2026?",,2026-03-10T16:00:00+00:00,0,0.0000,0.000000,0.0000,0.0056,{},,
+andrew-tate-of-tweets-march-3-march-10-2026-520-549,"Will Andrew Tate post 520-549 posts from March 3 to March 10, 2026?",,2026-03-10T16:00:00+00:00,0,0.0000,0.000000,0.0000,0.0415,{},,spread=0.042>0.030
+andrew-tate-of-tweets-march-3-march-10-2026-490-519,"Will Andrew Tate post 490-519 posts from March 3 to March 10, 2026?",,2026-03-10T16:00:00+00:00,0,0.0000,0.000000,0.0000,0.0636,{},,spread=0.064>0.030
+andrew-tate-of-tweets-march-3-march-10-2026-460-489,"Will Andrew Tate post 460-489 posts from March 3 to March 10, 2026?",,2026-03-10T16:00:00+00:00,0,0.0000,0.000000,0.0000,0.0559,{},,spread=0.056>0.030
+andrew-tate-of-tweets-march-3-march-10-2026-430-459,"Will Andrew Tate post 430-459 posts from March 3 to March 10, 2026?",,2026-03-10T16:00:00+00:00,0,0.0000,0.000000,0.0000,0.1091,{},,spread=0.109>0.030
+andrew-tate-of-tweets-march-3-march-10-2026-400-429,"Will Andrew Tate post 400-429 posts from March 3 to March 10, 2026?",,2026-03-10T16:00:00+00:00,0,0.0000,0.000000,0.0000,0.0541,{},,spread=0.054>0.030
+ucl-gal-liv1-2026-03-10-halftime-result-away,Liverpool FC leading at halftime?,,2026-03-10T17:45:00+00:00,0,0.0000,0.000000,0.0000,0.3157,{},,spread=0.316>0.030
+ucl-gal-liv1-2026-03-10-halftime-result-draw,Galatasaray SK vs. Liverpool FC: Draw at halftime?,,2026-03-10T17:45:00+00:00,0,0.0000,0.000000,0.0000,0.3500,{},,spread=0.350>0.030
+ucl-gal-liv1-2026-03-10-halftime-result-home,Galatasaray SK leading at halftime?,,2026-03-10T17:45:00+00:00,0,0.0000,0.000000,0.0000,0.3340,{},,spread=0.334>0.030
+will-nils-walker-be-the-republican-nominee-for-tx-30,Will Nils Walker be the Republican Nominee for TX-30?,,2026-03-03T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.2049,{},,spread=0.205>0.030
+will-everett-jackson-be-the-republican-nominee-for-tx-30,Will Everett Jackson be the Republican Nominee for TX-30?,,2026-03-03T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.1022,{},,spread=0.102>0.030
+will-gregor-heise-be-the-republican-nominee-for-tx-30,Will Gregor Heise be the Republican Nominee for TX-30?,,2026-03-03T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.2420,{},,spread=0.242>0.030
+will-sholdon-daniels-be-the-republican-nominee-for-tx-30,Will Sholdon Daniels be the Republican Nominee for TX-30?,,2026-03-03T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.2267,{},,spread=0.227>0.030
+will-achim-steiner-be-the-next-secretary-general-of-the-united-nations,Will Achim Steiner be the next Secretary General of the United Nations?,,2026-02-28T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0456,{},,spread=0.046>0.030
+will-mia-mottley-be-the-next-secretary-general-of-the-united-nations,Will Mia Mottley be the next Secretary General of the United Nations?,,2026-02-28T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.1150,{},,spread=0.115>0.030
+will-amina-mohammed-be-the-next-secretary-general-of-the-united-nations,Will Amina Mohammed be the next Secretary General of the United Nations?,,2026-02-28T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.3572,{},,spread=0.357>0.030
+will-vuk-jeremi-be-the-next-secretary-general-of-the-united-nations,Will Vuk Jeremić be the next Secretary General of the United Nations?,,2026-02-28T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0039,{},,
+will-kristalina-georgieva-be-the-next-secretary-general-of-the-united-nations,Will Kristalina Georgieva be the next Secretary General of the United Nations?,,2026-02-28T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.2132,{},,spread=0.213>0.030
+will-maria-fernanda-espinosa-garcs-be-the-next-secretary-general-of-the-united-nations,Will Maria Fernanda Espinosa Garcés be the next Secretary General of the United ,,2026-02-28T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.2032,{},,spread=0.203>0.030
+will-alicia-brcena-be-the-next-secretary-general-of-the-united-nations,Will Alicia Bárcena be the next Secretary General of the United Nations?,,2026-02-28T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.1300,{},,spread=0.130>0.030
+will-jacinda-ardern-be-the-next-secretary-general-of-the-united-nations,Will Jacinda Ardern be the next Secretary General of the United Nations?,,2026-02-28T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.2538,{},,spread=0.254>0.030
+will-rafael-grossi-be-the-next-secretary-general-of-the-united-nations,Will Rafael Grossi be the next Secretary General of the United Nations?,,2026-02-28T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.2284,{},,spread=0.228>0.030
+will-bruno-donat-be-the-next-secretary-general-of-the-united-nations,Will Bruno Donat be the next Secretary General of the United Nations?,,2026-02-28T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.2256,{},,spread=0.226>0.030
+will-colombe-cahen-salvador-be-the-next-secretary-general-of-the-united-nations,Will Colombe Cahen-Salvador be the next Secretary General of the United Nations?,,2026-02-28T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0441,{},,spread=0.044>0.030
+will-rebeca-grynspan-be-the-next-secretary-general-of-the-united-nations,Will Rebeca Grynspan be the next Secretary General of the United Nations?,,2026-02-28T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.4078,{},,spread=0.408>0.030
+will-michelle-bachelet-be-the-next-secretary-general-of-the-united-nations,Will Michelle Bachelet be the next Secretary General of the United Nations?,,2026-02-28T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.1017,{},,spread=0.102>0.030
+will-david-choquehuanca-be-the-next-secretary-general-of-the-united-nations,Will David Choquehuanca be the next Secretary General of the United Nations?,,2026-02-28T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0039,{},,
+will-albert-littell-be-the-democratic-nominee-for-senate-in-mississippi,Will Albert Littell be the Democratic nominee for Senate in Mississippi?,,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0127,{},,
+will-scott-colom-be-the-democratic-nominee-for-senate-in-mississippi,Will Scott Colom be the Democratic nominee for Senate in Mississippi?,,2026-03-10T00:00:00+00:00,1,0.0000,-0.014000,0.0000,0.0141,{'timeout': 1},,
+will-sarah-adlakha-be-the-republican-nominee-for-senate-from-mississippi,Will Sarah Adlakha be the Republican nominee for Senate from Mississippi?,,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0036,{},,
+will-cindy-hyde-smith-be-the-republican-nominee-for-senate-from-mississippi,Will Cindy Hyde-Smith be the Republican nominee for Senate from Mississippi?,,2026-03-10T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0068,{},,
+will-clemson-win-the-2025-2026-acc-mens-basketball-regular-season-championship,Will Clemson win the 2025-2026 ACC Men’s Basketball regular season championship?,,2026-03-07T00:00:00+00:00,0,0.0000,0.000000,0.0000,0.0559,{},,spread=0.056>0.030
+will-miracjl-win-the-most-seats-in-the-2026-colombian-chamber-of-representatives-election,Will MIRA‑CJL win the most seats in the 2026 Colombian Chamber of Representative,,2026-03-08T20:00:00+00:00,0,0.0000,0.000000,0.0000,0.0016,{},,
