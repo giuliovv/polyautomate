@@ -191,7 +191,7 @@ def _extract_token_ids(market: dict) -> tuple[str | None, str | None]:
     for token in market.get("tokens", []) or []:
         if not isinstance(token, dict):
             continue
-        token_id = token.get("token_id") or token.get("tokenId")
+        token_id = token.get("token_id") or token.get("tokenId") or token.get("id")
         label = str(token.get("outcome") or token.get("label") or token.get("name") or "").strip().lower()
         if not isinstance(token_id, str) or not token_id:
             continue
