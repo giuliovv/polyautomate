@@ -564,9 +564,10 @@ def _place_order_signed(
     private_key: str,
     funder: str,
     signature_type: int,
-) -> tuple[str, str, float, float | None, bool]:
+) -> tuple[str, str, float, float | None, bool, bool]:
     from py_clob_client.client import ClobClient
     from py_clob_client.clob_types import ApiCreds, OrderArgs, OrderType
+    from py_clob_client.exceptions import PolyApiException
     from py_clob_client.order_builder.constants import BUY, SELL
 
     buy_side = BUY if side.lower() == "buy" else SELL
@@ -616,7 +617,25 @@ def _place_order_signed(
             side=buy_side,
         )
     )
-    response: Any = client.post_order(signed_order, OrderType.GTC, post_only=True)
+    used_taker_fallback = False
+    allow_taker_fallback = os.getenv("LONGSHOT_ALLOW_TAKER_FALLBACK", "1") == "1"
+    try:
+        response: Any = client.post_order(signed_order, OrderType.GTC, post_only=True)
+    except PolyApiException as exc:
+        err = str(exc).lower()
+        crosses_book = "invalid post-only order: order crosses book" in err or "crosses the book" in err
+        if not (allow_taker_fallback and crosses_book):
+            raise
+        LOGGER.warning(
+            "post_only_crosses_book token_id=%s side=%s price=%.4f size=%.4f — retrying with post_only=false",
+            token_id,
+            side,
+            price,
+            submitted_size,
+        )
+        response = client.post_order(signed_order, OrderType.GTC, post_only=False)
+        used_taker_fallback = True
+
     order_id = ""
     status = "submitted"
     if isinstance(response, dict):
@@ -624,7 +643,7 @@ def _place_order_signed(
             str(response.get("orderID") or response.get("orderId") or response.get("id") or "")
         )
         status = str(response.get("status", status))
-    return order_id, status, submitted_size, effective_min_size, clamped
+    return order_id, status, submitted_size, effective_min_size, clamped, used_taker_fallback
 
 
 def run_once() -> int:
@@ -791,7 +810,7 @@ def run_once() -> int:
                 f"{sizing.applied_fraction:.4f}" if sizing.applied_fraction is not None else "na",
             )
         else:
-            order_id, status, submitted_size, min_order_size, clamped = _place_order_signed(
+            order_id, status, submitted_size, min_order_size, clamped, taker_fallback = _place_order_signed(
                 token_id=token_id,
                 side=side,
                 price=price,
@@ -827,7 +846,7 @@ def run_once() -> int:
                     f"notional_requested={requested_notional:.2f} notional_submitted={executed_notional:.2f}"
                 )
             LOGGER.info(
-                "order_submitted slug=%s order_id=%s status=%s price=%.4f size=%.4f yes_price=%.4f avg_spread=%.4f rel_spread=%.2f sizing=%s notional=%.2f p_no=%s full_kelly=%s f=%s",
+                "order_submitted slug=%s order_id=%s status=%s price=%.4f size=%.4f yes_price=%.4f avg_spread=%.4f rel_spread=%.2f sizing=%s notional=%.2f p_no=%s full_kelly=%s f=%s taker_fallback=%s",
                 c.slug,
                 order_id,
                 status,
@@ -841,6 +860,7 @@ def run_once() -> int:
                 f"{sizing.no_win_prob:.3f}" if sizing.no_win_prob is not None else "na",
                 f"{sizing.full_kelly:.4f}" if sizing.full_kelly is not None else "na",
                 f"{sizing.applied_fraction:.4f}" if sizing.applied_fraction is not None else "na",
+                taker_fallback,
             )
             _send_telegram_message(
                 "Executor operation submitted.\n"
@@ -848,6 +868,7 @@ def run_once() -> int:
                 f"order_id={order_id} status={status}\n"
                 f"yes_price={c.yes_price:.4f} no_price={price:.4f}\n"
                 f"size={submitted_size:.4f} notional={executed_notional:.2f}\n"
+                f"post_only_fallback={int(taker_fallback)}\n"
                 f"kelly_f={f'{sizing.applied_fraction:.4f}' if sizing.applied_fraction is not None else 'na'} "
                 f"p_no={f'{sizing.no_win_prob:.3f}' if sizing.no_win_prob is not None else 'na'}"
             )
