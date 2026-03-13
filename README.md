@@ -119,27 +119,50 @@ Each CSV is indexed by timestamp and ready for downstream analysis.
 
 ## Authentication notes
 
-The trading client signs every request using the standard Polymarket CLOB flow:
+The flow below is the one we use in production and matches the Polymarket CLOB model.
 
-### Before you can trade programmatically
+### What you need
 
-1. Log in at [polymarket.com](https://polymarket.com) with your wallet (e.g. MetaMask).
-2. Navigate to **Settings → API** and follow the prompts to enable API access. Polymarket
-   has you confirm the request with your wallet; this step is where MetaMask is involved.
-3. Download the generated credentials (`apiKey` and `secret`). The secret is an Ed25519
-   private key expressed in hex. Store it securely—Polymarket only shows it once.
-4. Supply those values to `PolymarketTradingClient`. From that point on, requests are
-   signed locally with the Ed25519 secret rather than through MetaMask.
+1. Wallet private key for the EOA signer address.
+2. CLOB API credentials: `apiKey`, `secret`, `passphrase`.
+3. Funder/proxy wallet address (for Magic/email/proxy setups, this differs from signer EOA).
 
+### How to obtain credentials (recommended)
+
+1. Log in at [polymarket.com](https://polymarket.com) with your wallet.
+2. Go to **Settings -> API** and enable API access.
+3. Either:
+   - use credentials shown in UI (`apiKey`, `secret`, `passphrase`), or
+   - derive them programmatically from wallet key using the official `py-clob-client`:
+
+```python
+from py_clob_client.client import ClobClient
+
+HOST = "https://clob.polymarket.com"
+CHAIN_ID = 137
+PRIVATE_KEY = "0x..."              # signer EOA private key
+SIGNATURE_TYPE = 1                 # 1 for Magic/email proxy, 0 for pure EOA
+FUNDER = "0x..."                   # proxy/funder wallet (or same as signer for pure EOA)
+
+client = ClobClient(HOST, chain_id=CHAIN_ID, key=PRIVATE_KEY, signature_type=SIGNATURE_TYPE, funder=FUNDER)
+creds = client.create_or_derive_api_creds()
+print(creds.api_key, creds.api_secret, creds.api_passphrase)
 ```
-signature = Ed25519_sign(
-    timestamp + HTTP_METHOD + path + canonical_json_body
-)
-```
 
-- `timestamp` is expressed in milliseconds and automatically generated.
-- `canonical_json_body` is serialized with sorted keys and no whitespace.
-- Install `pynacl` to provide Ed25519 signing support.
+### Secret mapping used in this repo
 
-Consult the official Polymarket API documentation to learn how to create API keys
-and to understand the permissible order parameters.
+- `POLYMARKET_API_KEY` -> CLOB `apiKey`
+- `POLYMARKET_SIGNING_KEY` -> CLOB `secret` (L2 auth secret)
+- `POLYMARKET_PASSPHRASE` -> CLOB `passphrase`
+- `POLYMARKET_SIGNER_ADDRESS` -> signer EOA address
+- `POLYMARKET_ADDRESS` -> funder/proxy wallet address
+- `POLYMARKET_SIGNATURE_TYPE` -> `0` (EOA), `1` (Magic/email proxy), `2` (browser-wallet proxy)
+
+Important:
+- `POLYMARKET_SIGNING_KEY` is not your wallet private key.
+- Keep wallet private key and API secret separate.
+- If credentials are regenerated, update all three values together (`apiKey`, `secret`, `passphrase`).
+
+Consult official docs for latest auth/order requirements:
+- https://docs.polymarket.com/developers/CLOB/authentication
+- https://docs.polymarket.com/developers/CLOB/orders/create-order
