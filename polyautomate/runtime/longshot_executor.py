@@ -116,6 +116,81 @@ def _send_telegram_message(text: str) -> None:
         LOGGER.exception("telegram_send_failed")
 
 
+def _record_min_size_override(
+    state: dict,
+    *,
+    now: datetime,
+    slug: str,
+    requested_size: float,
+    submitted_size: float,
+    price: float,
+    bankroll_usd: float | None,
+    target_fraction: float | None,
+) -> None:
+    by_day = state.setdefault("min_size_overrides_by_day", {})
+    day_key = now.date().isoformat()
+    day = by_day.setdefault(
+        day_key,
+        {
+            "count": 0,
+            "extra_notional_usd": 0.0,
+            "required_bankroll_max_usd": 0.0,
+            "deficit_max_usd": 0.0,
+            "examples": [],
+        },
+    )
+    extra_notional = max(0.0, (submitted_size - requested_size) * price)
+    day["count"] = int(day.get("count", 0)) + 1
+    day["extra_notional_usd"] = float(day.get("extra_notional_usd", 0.0)) + extra_notional
+
+    if target_fraction and target_fraction > 0:
+        required_bankroll = (submitted_size * price) / target_fraction
+        day["required_bankroll_max_usd"] = max(float(day.get("required_bankroll_max_usd", 0.0)), required_bankroll)
+        if bankroll_usd is not None:
+            day["deficit_max_usd"] = max(
+                float(day.get("deficit_max_usd", 0.0)),
+                max(0.0, required_bankroll - bankroll_usd),
+            )
+
+    examples = list(day.get("examples", []))
+    if len(examples) < 5:
+        examples.append(
+            {
+                "slug": slug,
+                "requested_size": round(requested_size, 4),
+                "submitted_size": round(submitted_size, 4),
+                "price": round(price, 4),
+            }
+        )
+        day["examples"] = examples
+
+
+def _maybe_send_min_size_daily_summary(state: dict, now: datetime) -> None:
+    today = now.date().isoformat()
+    by_day = state.get("min_size_overrides_by_day", {})
+    if not isinstance(by_day, dict):
+        return
+    reported = set(state.get("min_size_override_reported_days", []))
+    for day_key in sorted(by_day.keys()):
+        if day_key >= today or day_key in reported:
+            continue
+        day = by_day.get(day_key) or {}
+        count = int(day.get("count", 0))
+        if count <= 0:
+            reported.add(day_key)
+            continue
+        msg = (
+            f"Executor daily min-size overrides ({day_key})\n"
+            f"count={count}\n"
+            f"extra_notional_usd={float(day.get('extra_notional_usd', 0.0)):.2f}\n"
+            f"required_bankroll_max_usd={float(day.get('required_bankroll_max_usd', 0.0)):.2f}\n"
+            f"deficit_max_usd={float(day.get('deficit_max_usd', 0.0)):.2f}"
+        )
+        _send_telegram_message(msg)
+        reported.add(day_key)
+    state["min_size_override_reported_days"] = sorted(reported)
+
+
 def _extract_token_price(market: dict, outcome: str) -> float | None:
     for token in market.get("tokens", []) or []:
         if not isinstance(token, dict):
@@ -489,7 +564,7 @@ def _place_order_signed(
     private_key: str,
     funder: str,
     signature_type: int,
-) -> tuple[str, str]:
+) -> tuple[str, str, float, float | None, bool]:
     from py_clob_client.client import ClobClient
     from py_clob_client.clob_types import ApiCreds, OrderArgs, OrderType
     from py_clob_client.order_builder.constants import BUY, SELL
@@ -510,11 +585,29 @@ def _place_order_signed(
         )
     )
 
+    requested_size = max(size, 0.0)
+    min_order_size: float | None = None
+    try:
+        book = client.get_order_book(token_id)
+        raw_min = getattr(book, "min_order_size", None)
+        if raw_min is None and isinstance(book, dict):
+            raw_min = book.get("min_order_size")
+        if raw_min is not None:
+            min_order_size = float(raw_min)
+    except Exception:
+        LOGGER.exception("min_order_size_fetch_failed token_id=%s", token_id)
+
+    submitted_size = requested_size
+    clamped = False
+    if min_order_size is not None and submitted_size < min_order_size:
+        submitted_size = min_order_size
+        clamped = True
+
     signed_order = client.create_order(
         OrderArgs(
             token_id=token_id,
             price=price,
-            size=size,
+            size=submitted_size,
             side=buy_side,
         )
     )
@@ -526,7 +619,7 @@ def _place_order_signed(
             str(response.get("orderID") or response.get("orderId") or response.get("id") or "")
         )
         status = str(response.get("status", status))
-    return order_id, status
+    return order_id, status, submitted_size, min_order_size, clamped
 
 
 def run_once() -> int:
@@ -548,6 +641,7 @@ def run_once() -> int:
     now = datetime.now(timezone.utc)
     state_path = Path(os.getenv("LONGSHOT_STATE_PATH", "/var/lib/polyautomate/longshot-state.json"))
     state = _normalize_state(_load_state(state_path))
+    _maybe_send_min_size_daily_summary(state, now)
     open_positions: dict = state.setdefault("open_positions", {})
 
     lookback_minutes = int(os.getenv("LONGSHOT_LOOKBACK_MINUTES", "240"))
@@ -653,6 +747,7 @@ def run_once() -> int:
         max_rel_spread,
     )
     if not candidates:
+        _save_state(state_path, state)
         return 0
 
     actions = 0
@@ -691,7 +786,7 @@ def run_once() -> int:
                 f"{sizing.applied_fraction:.4f}" if sizing.applied_fraction is not None else "na",
             )
         else:
-            order_id, status = _place_order_signed(
+            order_id, status, submitted_size, min_order_size, clamped = _place_order_signed(
                 token_id=token_id,
                 side=side,
                 price=price,
@@ -703,18 +798,41 @@ def run_once() -> int:
                 funder=pm_address,
                 signature_type=pm_signature_type,
             )
+            executed_notional = submitted_size * price
+            requested_notional = sizing.notional_usd
+            target_fraction = None
+            if live_bankroll_usd and live_bankroll_usd > 0:
+                target_fraction = requested_notional / live_bankroll_usd
+            if clamped:
+                _record_min_size_override(
+                    state,
+                    now=now,
+                    slug=c.slug,
+                    requested_size=order_size,
+                    submitted_size=submitted_size,
+                    price=price,
+                    bankroll_usd=live_bankroll_usd,
+                    target_fraction=target_fraction,
+                )
+                _send_telegram_message(
+                    "Executor min-size override applied.\n"
+                    f"slug={c.slug}\n"
+                    f"requested_size={order_size:.4f} submitted_size={submitted_size:.4f}\n"
+                    f"min_size={min_order_size if min_order_size is not None else 'unknown'}\n"
+                    f"notional_requested={requested_notional:.2f} notional_submitted={executed_notional:.2f}"
+                )
             LOGGER.info(
                 "order_submitted slug=%s order_id=%s status=%s price=%.4f size=%.4f yes_price=%.4f avg_spread=%.4f rel_spread=%.2f sizing=%s notional=%.2f p_no=%s full_kelly=%s f=%s",
                 c.slug,
                 order_id,
                 status,
                 price,
-                order_size,
+                submitted_size,
                 c.yes_price,
                 c.avg_spread,
                 c.rel_spread,
                 sizing.method,
-                sizing.notional_usd,
+                executed_notional,
                 f"{sizing.no_win_prob:.3f}" if sizing.no_win_prob is not None else "na",
                 f"{sizing.full_kelly:.4f}" if sizing.full_kelly is not None else "na",
                 f"{sizing.applied_fraction:.4f}" if sizing.applied_fraction is not None else "na",
@@ -724,10 +842,11 @@ def run_once() -> int:
                 f"slug={c.slug}\n"
                 f"order_id={order_id} status={status}\n"
                 f"yes_price={c.yes_price:.4f} no_price={price:.4f}\n"
-                f"size={order_size:.4f} notional={sizing.notional_usd:.2f}\n"
+                f"size={submitted_size:.4f} notional={executed_notional:.2f}\n"
                 f"kelly_f={f'{sizing.applied_fraction:.4f}' if sizing.applied_fraction is not None else 'na'} "
                 f"p_no={f'{sizing.no_win_prob:.3f}' if sizing.no_win_prob is not None else 'na'}"
             )
+            order_size = submitted_size
 
         open_positions[c.slug] = {
             "slug": c.slug,
