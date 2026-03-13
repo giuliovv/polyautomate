@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import time
+from typing import Any
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -14,8 +15,6 @@ from pathlib import Path
 import requests
 
 from polyautomate.clients.polymarketdata import PMDClient, PMDError
-from polyautomate.clients.trading import PolymarketTradingClient
-from polyautomate.models import OrderRequest
 
 
 LOGGER = logging.getLogger("longshot_executor")
@@ -478,14 +477,68 @@ def _compute_order_size(
     )
 
 
+def _place_order_signed(
+    *,
+    token_id: str,
+    side: str,
+    price: float,
+    size: float,
+    api_key: str,
+    api_secret: str,
+    api_passphrase: str,
+    private_key: str,
+    funder: str,
+    signature_type: int,
+) -> tuple[str, str]:
+    from py_clob_client.client import ClobClient
+    from py_clob_client.clob_types import ApiCreds, OrderArgs, OrderType
+    from py_clob_client.order_builder.constants import BUY, SELL
+
+    buy_side = BUY if side.lower() == "buy" else SELL
+    client = ClobClient(
+        "https://clob.polymarket.com",
+        chain_id=137,
+        key=private_key,
+        signature_type=signature_type,
+        funder=funder,
+    )
+    client.set_api_creds(
+        ApiCreds(
+            api_key=api_key,
+            api_secret=api_secret,
+            api_passphrase=api_passphrase,
+        )
+    )
+
+    signed_order = client.create_order(
+        OrderArgs(
+            token_id=token_id,
+            price=price,
+            size=size,
+            side=buy_side,
+        )
+    )
+    response: Any = client.post_order(signed_order, OrderType.GTC, post_only=True)
+    order_id = ""
+    status = "submitted"
+    if isinstance(response, dict):
+        order_id = (
+            str(response.get("orderID") or response.get("orderId") or response.get("id") or "")
+        )
+        status = str(response.get("status", status))
+    return order_id, status
+
+
 def run_once() -> int:
     pmd_api_key = os.getenv("POLYMARKETDATA_API_KEY", "")
     pm_api_key = os.getenv("POLYMARKET_API_KEY", "")
     pm_signing_key = os.getenv("POLYMARKET_SIGNING_KEY", "")
     pm_passphrase = os.getenv("POLYMARKET_PASSPHRASE", "")
+    pm_private_key = os.getenv("POLYMARKET_PRIVATE_KEY", "")
     pm_address = os.getenv("POLYMARKET_ADDRESS", "")
     # EOA address for POLY_ADDRESS header; falls back to pm_address for pure-EOA accounts.
     pm_signer_address = os.getenv("POLYMARKET_SIGNER_ADDRESS") or pm_address
+    pm_signature_type = int(os.getenv("POLYMARKET_SIGNATURE_TYPE", "1"))
     dry_run = os.getenv("DRY_RUN", "1") == "1"
 
     if not pmd_api_key:
@@ -516,19 +569,14 @@ def run_once() -> int:
     # as the bankroll for Kelly sizing.  This means sizing automatically scales
     # with the real account rather than relying on a manually-maintained env var.
     # In dry-run mode we fall back to LONGSHOT_BANKROLL_USD (no real credentials).
-    trader: PolymarketTradingClient | None = None
     live_bankroll_usd: float | None = None
     if not dry_run:
         if not pm_api_key or not pm_signing_key or not pm_passphrase or not pm_address:
             LOGGER.warning("missing_trading_credentials")
             return 0
-        trader = PolymarketTradingClient(
-            api_key=pm_api_key,
-            api_secret=pm_signing_key,
-            api_passphrase=pm_passphrase,
-            address=pm_address,
-            signer_address=pm_signer_address,
-        )
+        if not pm_private_key:
+            LOGGER.warning("missing_trading_private_key")
+            return 0
         live_bankroll_usd = _fetch_usdc_balance()
         if live_bankroll_usd is not None:
             LOGGER.info("live_balance_usd=%.2f", live_bankroll_usd)
@@ -643,20 +691,23 @@ def run_once() -> int:
                 f"{sizing.applied_fraction:.4f}" if sizing.applied_fraction is not None else "na",
             )
         else:
-            expiration = int((now + timedelta(minutes=15)).timestamp())
-            order = OrderRequest(
+            order_id, status = _place_order_signed(
                 token_id=token_id,
                 side=side,
-                price=f"{price:.4f}",
-                size=f"{order_size:.4f}",
-                expiration=expiration,
+                price=price,
+                size=order_size,
+                api_key=pm_api_key,
+                api_secret=pm_signing_key,
+                api_passphrase=pm_passphrase,
+                private_key=pm_private_key,
+                funder=pm_address,
+                signature_type=pm_signature_type,
             )
-            ack = trader.place_order(order, post_only=True)  # type: ignore[union-attr]
             LOGGER.info(
                 "order_submitted slug=%s order_id=%s status=%s price=%.4f size=%.4f yes_price=%.4f avg_spread=%.4f rel_spread=%.2f sizing=%s notional=%.2f p_no=%s full_kelly=%s f=%s",
                 c.slug,
-                ack.order_id,
-                ack.status,
+                order_id,
+                status,
                 price,
                 order_size,
                 c.yes_price,
@@ -671,7 +722,7 @@ def run_once() -> int:
             _send_telegram_message(
                 "Executor operation submitted.\n"
                 f"slug={c.slug}\n"
-                f"order_id={ack.order_id} status={ack.status}\n"
+                f"order_id={order_id} status={status}\n"
                 f"yes_price={c.yes_price:.4f} no_price={price:.4f}\n"
                 f"size={order_size:.4f} notional={sizing.notional_usd:.2f}\n"
                 f"kelly_f={f'{sizing.applied_fraction:.4f}' if sizing.applied_fraction is not None else 'na'} "
