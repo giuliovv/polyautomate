@@ -586,6 +586,7 @@ def _place_order_signed(
     )
 
     requested_size = max(size, 0.0)
+    fallback_min_size = float(os.getenv("LONGSHOT_MIN_ORDER_SIZE_SHARES", "5"))
     min_order_size: float | None = None
     try:
         book = client.get_order_book(token_id)
@@ -597,10 +598,14 @@ def _place_order_signed(
     except Exception:
         LOGGER.exception("min_order_size_fetch_failed token_id=%s", token_id)
 
+    effective_min_size = fallback_min_size
+    if min_order_size is not None:
+        effective_min_size = max(effective_min_size, min_order_size)
+
     submitted_size = requested_size
     clamped = False
-    if min_order_size is not None and submitted_size < min_order_size:
-        submitted_size = min_order_size
+    if submitted_size < effective_min_size:
+        submitted_size = effective_min_size
         clamped = True
 
     signed_order = client.create_order(
@@ -619,7 +624,7 @@ def _place_order_signed(
             str(response.get("orderID") or response.get("orderId") or response.get("id") or "")
         )
         status = str(response.get("status", status))
-    return order_id, status, submitted_size, min_order_size, clamped
+    return order_id, status, submitted_size, effective_min_size, clamped
 
 
 def run_once() -> int:
