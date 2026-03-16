@@ -1,0 +1,20 @@
+{
+  "version": "40.0.0",
+  "files": {
+    "9b963f7551cf2000fbd77c9e689e83acf540163b940d8d59809b57cde76eed99": {
+      "source": {
+        "path": "BotplatformStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-eu-west-1": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-eu-west-1",
+          "objectKey": "9b963f7551cf2000fbd77c9e689e83acf540163b940d8d59809b57cde76eed99.json",
+          "region": "eu-west-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-eu-west-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

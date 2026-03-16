@@ -1,0 +1,254 @@
+{
+ "Resources": {
+  "BotplatformUserPoolCF60B8DF": {
+   "Type": "AWS::Cognito::UserPool",
+   "Properties": {
+    "AccountRecoverySetting": {
+     "RecoveryMechanisms": [
+      {
+       "Name": "verified_email",
+       "Priority": 1
+      }
+     ]
+    },
+    "AdminCreateUserConfig": {
+     "AllowAdminCreateUserOnly": false
+    },
+    "AutoVerifiedAttributes": [
+     "email"
+    ],
+    "EmailVerificationMessage": "The verification code to your new account is {####}",
+    "EmailVerificationSubject": "Verify your new account",
+    "Policies": {
+     "PasswordPolicy": {
+      "MinimumLength": 8,
+      "RequireLowercase": true,
+      "RequireNumbers": true,
+      "RequireSymbols": false,
+      "RequireUppercase": true
+     }
+    },
+    "SmsVerificationMessage": "The verification code to your new account is {####}",
+    "UserPoolName": "botplatform-users",
+    "UsernameAttributes": [
+     "email"
+    ],
+    "VerificationMessageTemplate": {
+     "DefaultEmailOption": "CONFIRM_WITH_CODE",
+     "EmailMessage": "The verification code to your new account is {####}",
+     "EmailSubject": "Verify your new account",
+     "SmsMessage": "The verification code to your new account is {####}"
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "BotplatformStack/BotplatformUserPool/Resource"
+   }
+  },
+  "BotplatformUserPoolBotplatformWebClient495E5232": {
+   "Type": "AWS::Cognito::UserPoolClient",
+   "Properties": {
+    "AccessTokenValidity": 60,
+    "AllowedOAuthFlows": [
+     "implicit",
+     "code"
+    ],
+    "AllowedOAuthFlowsUserPoolClient": true,
+    "AllowedOAuthScopes": [
+     "email",
+     "openid",
+     "profile"
+    ],
+    "CallbackURLs": [
+     "http://localhost:3000/",
+     "https://botplatform.example.com/"
+    ],
+    "ClientName": "botplatform-web",
+    "ExplicitAuthFlows": [
+     "ALLOW_USER_PASSWORD_AUTH",
+     "ALLOW_USER_SRP_AUTH",
+     "ALLOW_REFRESH_TOKEN_AUTH"
+    ],
+    "GenerateSecret": false,
+    "IdTokenValidity": 60,
+    "LogoutURLs": [
+     "http://localhost:3000/",
+     "https://botplatform.example.com/"
+    ],
+    "RefreshTokenValidity": 43200,
+    "SupportedIdentityProviders": [
+     "COGNITO"
+    ],
+    "TokenValidityUnits": {
+     "AccessToken": "minutes",
+     "IdToken": "minutes",
+     "RefreshToken": "minutes"
+    },
+    "UserPoolId": {
+     "Ref": "BotplatformUserPoolCF60B8DF"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "BotplatformStack/BotplatformUserPool/BotplatformWebClient/Resource"
+   }
+  },
+  "WalletEncryptionKeyB9DCAE22": {
+   "Type": "AWS::KMS::Key",
+   "Properties": {
+    "Description": "Encrypts wallet private keys in Bot Platform",
+    "EnableKeyRotation": true,
+    "KeyPolicy": {
+     "Statement": [
+      {
+       "Action": "kms:*",
+       "Effect": "Allow",
+       "Principal": {
+        "AWS": {
+         "Fn::Join": [
+          "",
+          [
+           "arn:",
+           {
+            "Ref": "AWS::Partition"
+           },
+           ":iam::",
+           {
+            "Ref": "AWS::AccountId"
+           },
+           ":root"
+          ]
+         ]
+        }
+       },
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "BotplatformStack/WalletEncryptionKey/Resource"
+   }
+  },
+  "WalletEncryptionKeyAlias6F67D41A": {
+   "Type": "AWS::KMS::Alias",
+   "Properties": {
+    "AliasName": "alias/botplatform/wallet-encryption",
+    "TargetKeyId": {
+     "Fn::GetAtt": [
+      "WalletEncryptionKeyB9DCAE22",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "BotplatformStack/WalletEncryptionKey/Alias/Resource"
+   }
+  },
+  "BotplatformSecretsD338EFEA": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "Description": "Application secrets for Bot Platform",
+    "GenerateSecretString": {
+     "ExcludePunctuation": true,
+     "GenerateStringKey": "SIGNER_SHARED_SECRET",
+     "PasswordLength": 32,
+     "SecretStringTemplate": "{\"SIGNER_SHARED_SECRET\":\"\"}"
+    },
+    "Name": "botplatform/app-secrets"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "BotplatformStack/BotplatformSecrets/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/03KMQ+CMBAF4N/CXk6QhdUwOkgkzqbWEyulNb0jhDT976YQjdP73r3bQ1lXUGRyplzdh9zoG4SOpRqEnOkalOutZgfhQuhb54xoHvbnLxqj0fL/tF2iGEaCcMQlbSkORktKZUUUhMoj0yit7NFD6NaeHjbFmHya+D1xFO3CT2d3FdRQFtmLtM79ZFmPCOctP7c+8DfQAAAA"
+   },
+   "Metadata": {
+    "aws:cdk:path": "BotplatformStack/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "CognitoUserPoolId": {
+   "Description": "Cognito User Pool ID",
+   "Value": {
+    "Ref": "BotplatformUserPoolCF60B8DF"
+   },
+   "Export": {
+    "Name": "BotplatformUserPoolId"
+   }
+  },
+  "CognitoClientId": {
+   "Description": "Cognito App Client ID",
+   "Value": {
+    "Ref": "BotplatformUserPoolBotplatformWebClient495E5232"
+   },
+   "Export": {
+    "Name": "BotplatformClientId"
+   }
+  },
+  "KmsKeyArn": {
+   "Description": "KMS Key ARN for wallet encryption",
+   "Value": {
+    "Fn::GetAtt": [
+     "WalletEncryptionKeyB9DCAE22",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "BotplatformKmsKeyArn"
+   }
+  },
+  "SecretsArn": {
+   "Description": "Secrets Manager ARN",
+   "Value": {
+    "Ref": "BotplatformSecretsD338EFEA"
+   },
+   "Export": {
+    "Name": "BotplatformSecretsArn"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

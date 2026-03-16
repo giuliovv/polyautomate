@@ -1,0 +1,119 @@
+{
+  "version": "40.0.0",
+  "artifacts": {
+    "BotplatformStack.assets": {
+      "type": "cdk:asset-manifest",
+      "properties": {
+        "file": "BotplatformStack.assets.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+      }
+    },
+    "BotplatformStack": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://unknown-account/eu-west-1",
+      "properties": {
+        "templateFile": "BotplatformStack.template.json",
+        "terminationProtection": false,
+        "validateOnSynth": false,
+        "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-deploy-role-${AWS::AccountId}-eu-west-1",
+        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-cfn-exec-role-${AWS::AccountId}-eu-west-1",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-eu-west-1/9b963f7551cf2000fbd77c9e689e83acf540163b940d8d59809b57cde76eed99.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
+        "additionalDependencies": [
+          "BotplatformStack.assets"
+        ],
+        "lookupRole": {
+          "arn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-lookup-role-${AWS::AccountId}-eu-west-1",
+          "requiresBootstrapStackVersion": 8,
+          "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+        }
+      },
+      "dependencies": [
+        "BotplatformStack.assets"
+      ],
+      "metadata": {
+        "/BotplatformStack/BotplatformUserPool/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BotplatformUserPoolCF60B8DF"
+          }
+        ],
+        "/BotplatformStack/BotplatformUserPool/BotplatformWebClient/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BotplatformUserPoolBotplatformWebClient495E5232"
+          }
+        ],
+        "/BotplatformStack/WalletEncryptionKey/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "WalletEncryptionKeyB9DCAE22"
+          }
+        ],
+        "/BotplatformStack/WalletEncryptionKey/Alias/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "WalletEncryptionKeyAlias6F67D41A"
+          }
+        ],
+        "/BotplatformStack/BotplatformSecrets/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BotplatformSecretsD338EFEA"
+          }
+        ],
+        "/BotplatformStack/CognitoUserPoolId": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CognitoUserPoolId"
+          }
+        ],
+        "/BotplatformStack/CognitoClientId": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CognitoClientId"
+          }
+        ],
+        "/BotplatformStack/KmsKeyArn": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "KmsKeyArn"
+          }
+        ],
+        "/BotplatformStack/SecretsArn": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "SecretsArn"
+          }
+        ],
+        "/BotplatformStack/CDKMetadata/Default": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CDKMetadata"
+          }
+        ],
+        "/BotplatformStack/BootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BootstrapVersion"
+          }
+        ],
+        "/BotplatformStack/CheckBootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CheckBootstrapVersion"
+          }
+        ]
+      },
+      "displayName": "BotplatformStack"
+    },
+    "Tree": {
+      "type": "cdk:tree",
+      "properties": {
+        "file": "tree.json"
+      }
+    }
+  }
+}

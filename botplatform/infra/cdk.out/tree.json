@@ -1,0 +1,337 @@
+{
+  "version": "tree-0.1",
+  "tree": {
+    "id": "App",
+    "path": "",
+    "children": {
+      "BotplatformStack": {
+        "id": "BotplatformStack",
+        "path": "BotplatformStack",
+        "children": {
+          "BotplatformUserPool": {
+            "id": "BotplatformUserPool",
+            "path": "BotplatformStack/BotplatformUserPool",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "BotplatformStack/BotplatformUserPool/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::Cognito::UserPool",
+                  "aws:cdk:cloudformation:props": {
+                    "accountRecoverySetting": {
+                      "recoveryMechanisms": [
+                        {
+                          "name": "verified_email",
+                          "priority": 1
+                        }
+                      ]
+                    },
+                    "adminCreateUserConfig": {
+                      "allowAdminCreateUserOnly": false
+                    },
+                    "autoVerifiedAttributes": [
+                      "email"
+                    ],
+                    "emailVerificationMessage": "The verification code to your new account is {####}",
+                    "emailVerificationSubject": "Verify your new account",
+                    "policies": {
+                      "passwordPolicy": {
+                        "minimumLength": 8,
+                        "requireLowercase": true,
+                        "requireUppercase": true,
+                        "requireNumbers": true,
+                        "requireSymbols": false
+                      }
+                    },
+                    "smsVerificationMessage": "The verification code to your new account is {####}",
+                    "usernameAttributes": [
+                      "email"
+                    ],
+                    "userPoolName": "botplatform-users",
+                    "verificationMessageTemplate": {
+                      "defaultEmailOption": "CONFIRM_WITH_CODE",
+                      "emailMessage": "The verification code to your new account is {####}",
+                      "emailSubject": "Verify your new account",
+                      "smsMessage": "The verification code to your new account is {####}"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cognito.CfnUserPool",
+                  "version": "2.183.0"
+                }
+              },
+              "BotplatformWebClient": {
+                "id": "BotplatformWebClient",
+                "path": "BotplatformStack/BotplatformUserPool/BotplatformWebClient",
+                "children": {
+                  "Resource": {
+                    "id": "Resource",
+                    "path": "BotplatformStack/BotplatformUserPool/BotplatformWebClient/Resource",
+                    "attributes": {
+                      "aws:cdk:cloudformation:type": "AWS::Cognito::UserPoolClient",
+                      "aws:cdk:cloudformation:props": {
+                        "accessTokenValidity": 60,
+                        "allowedOAuthFlows": [
+                          "implicit",
+                          "code"
+                        ],
+                        "allowedOAuthFlowsUserPoolClient": true,
+                        "allowedOAuthScopes": [
+                          "email",
+                          "openid",
+                          "profile"
+                        ],
+                        "callbackUrLs": [
+                          "http://localhost:3000/",
+                          "https://botplatform.example.com/"
+                        ],
+                        "clientName": "botplatform-web",
+                        "explicitAuthFlows": [
+                          "ALLOW_USER_PASSWORD_AUTH",
+                          "ALLOW_USER_SRP_AUTH",
+                          "ALLOW_REFRESH_TOKEN_AUTH"
+                        ],
+                        "generateSecret": false,
+                        "idTokenValidity": 60,
+                        "logoutUrLs": [
+                          "http://localhost:3000/",
+                          "https://botplatform.example.com/"
+                        ],
+                        "refreshTokenValidity": 43200,
+                        "supportedIdentityProviders": [
+                          "COGNITO"
+                        ],
+                        "tokenValidityUnits": {
+                          "idToken": "minutes",
+                          "accessToken": "minutes",
+                          "refreshToken": "minutes"
+                        },
+                        "userPoolId": {
+                          "Ref": "BotplatformUserPoolCF60B8DF"
+                        }
+                      }
+                    },
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.aws_cognito.CfnUserPoolClient",
+                      "version": "2.183.0"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cognito.UserPoolClient",
+                  "version": "2.183.0",
+                  "metadata": []
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_cognito.UserPool",
+              "version": "2.183.0",
+              "metadata": []
+            }
+          },
+          "WalletEncryptionKey": {
+            "id": "WalletEncryptionKey",
+            "path": "BotplatformStack/WalletEncryptionKey",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "BotplatformStack/WalletEncryptionKey/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::KMS::Key",
+                  "aws:cdk:cloudformation:props": {
+                    "description": "Encrypts wallet private keys in Bot Platform",
+                    "enableKeyRotation": true,
+                    "keyPolicy": {
+                      "Statement": [
+                        {
+                          "Action": "kms:*",
+                          "Effect": "Allow",
+                          "Principal": {
+                            "AWS": {
+                              "Fn::Join": [
+                                "",
+                                [
+                                  "arn:",
+                                  {
+                                    "Ref": "AWS::Partition"
+                                  },
+                                  ":iam::",
+                                  {
+                                    "Ref": "AWS::AccountId"
+                                  },
+                                  ":root"
+                                ]
+                              ]
+                            }
+                          },
+                          "Resource": "*"
+                        }
+                      ],
+                      "Version": "2012-10-17"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_kms.CfnKey",
+                  "version": "2.183.0"
+                }
+              },
+              "Alias": {
+                "id": "Alias",
+                "path": "BotplatformStack/WalletEncryptionKey/Alias",
+                "children": {
+                  "Resource": {
+                    "id": "Resource",
+                    "path": "BotplatformStack/WalletEncryptionKey/Alias/Resource",
+                    "attributes": {
+                      "aws:cdk:cloudformation:type": "AWS::KMS::Alias",
+                      "aws:cdk:cloudformation:props": {
+                        "aliasName": "alias/botplatform/wallet-encryption",
+                        "targetKeyId": {
+                          "Fn::GetAtt": [
+                            "WalletEncryptionKeyB9DCAE22",
+                            "Arn"
+                          ]
+                        }
+                      }
+                    },
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.aws_kms.CfnAlias",
+                      "version": "2.183.0"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_kms.Alias",
+                  "version": "2.183.0",
+                  "metadata": []
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_kms.Key",
+              "version": "2.183.0",
+              "metadata": []
+            }
+          },
+          "BotplatformSecrets": {
+            "id": "BotplatformSecrets",
+            "path": "BotplatformStack/BotplatformSecrets",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "BotplatformStack/BotplatformSecrets/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::SecretsManager::Secret",
+                  "aws:cdk:cloudformation:props": {
+                    "description": "Application secrets for Bot Platform",
+                    "generateSecretString": {
+                      "excludePunctuation": true,
+                      "generateStringKey": "SIGNER_SHARED_SECRET",
+                      "passwordLength": 32,
+                      "secretStringTemplate": "{\"SIGNER_SHARED_SECRET\":\"\"}"
+                    },
+                    "name": "botplatform/app-secrets"
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_secretsmanager.CfnSecret",
+                  "version": "2.183.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_secretsmanager.Secret",
+              "version": "2.183.0",
+              "metadata": []
+            }
+          },
+          "CognitoUserPoolId": {
+            "id": "CognitoUserPoolId",
+            "path": "BotplatformStack/CognitoUserPoolId",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnOutput",
+              "version": "2.183.0"
+            }
+          },
+          "CognitoClientId": {
+            "id": "CognitoClientId",
+            "path": "BotplatformStack/CognitoClientId",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnOutput",
+              "version": "2.183.0"
+            }
+          },
+          "KmsKeyArn": {
+            "id": "KmsKeyArn",
+            "path": "BotplatformStack/KmsKeyArn",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnOutput",
+              "version": "2.183.0"
+            }
+          },
+          "SecretsArn": {
+            "id": "SecretsArn",
+            "path": "BotplatformStack/SecretsArn",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnOutput",
+              "version": "2.183.0"
+            }
+          },
+          "CDKMetadata": {
+            "id": "CDKMetadata",
+            "path": "BotplatformStack/CDKMetadata",
+            "children": {
+              "Default": {
+                "id": "Default",
+                "path": "BotplatformStack/CDKMetadata/Default",
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.CfnResource",
+                  "version": "2.183.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "constructs.Construct",
+              "version": "10.4.2"
+            }
+          },
+          "BootstrapVersion": {
+            "id": "BootstrapVersion",
+            "path": "BotplatformStack/BootstrapVersion",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnParameter",
+              "version": "2.183.0"
+            }
+          },
+          "CheckBootstrapVersion": {
+            "id": "CheckBootstrapVersion",
+            "path": "BotplatformStack/CheckBootstrapVersion",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnRule",
+              "version": "2.183.0"
+            }
+          }
+        },
+        "constructInfo": {
+          "fqn": "aws-cdk-lib.Stack",
+          "version": "2.183.0"
+        }
+      },
+      "Tree": {
+        "id": "Tree",
+        "path": "Tree",
+        "constructInfo": {
+          "fqn": "constructs.Construct",
+          "version": "10.4.2"
+        }
+      }
+    },
+    "constructInfo": {
+      "fqn": "aws-cdk-lib.App",
+      "version": "2.183.0"
+    }
+  }
+}

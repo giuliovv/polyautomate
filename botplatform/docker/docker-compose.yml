@@ -1,0 +1,98 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: botplatform
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/botplatform
+      REDIS_URL: redis://redis:6379/0
+      SIGNER_URL: http://signer:8001
+      SIGNER_SHARED_SECRET: dev-signer-secret
+      AWS_REGION: eu-west-1
+      COGNITO_USER_POOL_ID: eu-west-1_TmIlhCUIo
+      COGNITO_APP_CLIENT_ID: 5bquiq00d709kjkd3e21p0gv6n
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+
+  signer:
+    build:
+      context: ..
+      dockerfile: docker/signer/Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      SIGNER_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/botplatform
+      SIGNER_BACKEND_SHARED_SECRET: dev-signer-secret
+      AWS_REGION: eu-west-1
+      KMS_KEY_ID: arn:aws:kms:eu-west-1:854656252703:key/a899261d-e72a-44ee-ac95-8af3a31f7623
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: uvicorn signer.main:app --host 0.0.0.0 --port 8001 --reload
+
+  executor:
+    build:
+      context: ..
+      dockerfile: docker/executor/Dockerfile
+    environment:
+      EXECUTOR_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/botplatform
+      EXECUTOR_SIGNER_URL: http://signer:8001
+      EXECUTOR_SIGNER_SHARED_SECRET: dev-signer-secret
+      EXECUTOR_DRY_RUN: "true"
+      EXECUTOR_POLL_INTERVAL_SECONDS: "60"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      signer:
+        condition: service_started
+    command: python -m executor.runner
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../docker/frontend/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_AWS_REGION: eu-west-1
+      NEXT_PUBLIC_COGNITO_USER_POOL_ID: eu-west-1_TmIlhCUIo
+      NEXT_PUBLIC_COGNITO_CLIENT_ID: 5bquiq00d709kjkd3e21p0gv6n
+    depends_on:
+      - backend
+    command: npm run dev
+
+volumes:
+  postgres_data:
