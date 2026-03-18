@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { AuthProvider } from '@/components/auth-provider';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview' },
@@ -19,34 +20,36 @@ export default function DashboardLayout({
   const pathname = usePathname();
 
   return (
-    <div className="min-h-screen flex">
-      {/* Sidebar */}
-      <aside className="w-64 border-r bg-card">
-        <div className="p-6">
-          <Link href="/" className="font-bold text-lg">
-            Bot Platform
-          </Link>
-        </div>
-        <nav className="px-3">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'block px-3 py-2 rounded-md text-sm mb-1',
-                pathname === item.href
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-accent'
-              )}
-            >
-              {item.label}
+    <AuthProvider>
+      <div className="min-h-screen flex">
+        {/* Sidebar */}
+        <aside className="w-64 border-r bg-card">
+          <div className="p-6">
+            <Link href="/" className="font-bold text-lg">
+              Bot Platform
             </Link>
-          ))}
-        </nav>
-      </aside>
+          </div>
+          <nav className="px-3">
+            {navItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'block px-3 py-2 rounded-md text-sm mb-1',
+                  pathname === item.href
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-accent'
+                )}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </aside>
 
-      {/* Main content */}
-      <main className="flex-1 p-8">{children}</main>
-    </div>
+        {/* Main content */}
+        <main className="flex-1 p-8">{children}</main>
+      </div>
+    </AuthProvider>
   );
 }
