@@ -64,7 +64,7 @@ export default function DashboardPage() {
               (summary?.total_pnl_usd ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'
             )}
           >
-            ${summary?.total_pnl_usd?.toFixed(2) ?? '0.00'}
+            ${(Number(summary?.total_pnl_usd) || 0).toFixed(2)}
           </p>
         </div>
       </div>

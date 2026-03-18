@@ -125,6 +125,29 @@ def _send_telegram_message(text: str) -> None:
         LOGGER.exception("telegram_send_failed")
 
 
+def _format_failure_telegram(outcome: RunOutcome) -> str:
+    lines = [
+        "Researcher run FAILED.",
+        f"backtest_rc={outcome.backtest_rc}",
+        f"claude_rc={outcome.claude_rc}",
+    ]
+
+    notes = (outcome.claude_notes or "").strip()
+    if notes:
+        compact_notes = " ".join(notes.split())
+        lines.append(f"claude_notes={compact_notes[:300]}")
+        lower = compact_notes.lower()
+        if "credit balance is too low" in lower or "insufficient" in lower or "quota" in lower:
+            lines.append("Likely cause: Claude credits/quota exhausted.")
+        elif "api key" in lower or "unauthorized" in lower or "forbidden" in lower:
+            lines.append("Likely cause: Claude auth/permission issue.")
+        elif "timed out" in lower:
+            lines.append("Likely cause: Claude CLI stalled; check auth/session and CLI health.")
+    if outcome.backtest_rc != 0:
+        lines.append("Backtest failed. Check BACKTEST_CMD and data/API availability.")
+    return "\n".join(lines)
+
+
 def _run_backtest(workspace_dir: Path) -> int:
     cmd_str = os.getenv("BACKTEST_CMD", "python examples/basic_usage.py")
     result = subprocess.run(shlex.split(cmd_str), cwd=str(workspace_dir), check=False)
@@ -250,13 +273,20 @@ def _run_claude_if_enabled(summary_path: str, prior_state: dict, workspace_dir: 
         "plus promotion criteria for any shadow strategy."
     )
 
-    result = subprocess.run(
-        ["claude", "-p", prompt],
-        cwd=str(workspace_dir),
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    timeout_seconds = int(os.getenv("CLAUDE_TIMEOUT_SECONDS", "900"))
+    try:
+        result = subprocess.run(
+            ["claude", "-p", prompt],
+            cwd=str(workspace_dir),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        LOGGER.error("claude_timeout seconds=%s", timeout_seconds)
+        return 124, f"Claude timed out after {timeout_seconds}s."
+
     output = (result.stdout or "").strip()
     if not output:
         output = (result.stderr or "").strip()
@@ -475,9 +505,7 @@ def main() -> None:
         )
         _send_telegram_message(msg)
     else:
-        _send_telegram_message(
-            f"Researcher run FAILED. backtest_rc={outcome.backtest_rc}, claude_rc={outcome.claude_rc}."
-        )
+        _send_telegram_message(_format_failure_telegram(outcome))
 
     if outcome.backtest_rc != 0 or outcome.claude_rc != 0:
         raise SystemExit(1)

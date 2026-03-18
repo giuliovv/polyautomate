@@ -79,11 +79,12 @@ export async function cognitoGetCurrentUser() {
   }
 }
 
-// Get JWT token for API calls
+// Get JWT token for API calls (using ID token to include email claim)
 export async function getAccessToken(): Promise<string | null> {
   try {
     const session = await fetchAuthSession();
-    const token = session.tokens?.accessToken?.toString();
+    // Use idToken instead of accessToken to include email claim
+    const token = session.tokens?.idToken?.toString();
     return token || null;
   } catch {
     return null;

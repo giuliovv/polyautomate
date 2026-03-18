@@ -257,6 +257,9 @@ def scan_market(
     max_price: float = 0.98,
     first_entry_only: bool = False,
     half_spread: float = 0.01,
+    max_days_left: float | None = None,
+    resolution_end: datetime | None = None,
+    use_metrics_spread: bool = True,
 ) -> list[LongshotTrade]:
     """
     Fetch price data for one resolved market and return zone-entry trades.
@@ -290,15 +293,16 @@ def scan_market(
     # Each metric bar's "spread" is the full bid-ask spread; we use half for
     # the one-way execution cost (mid → bid for SELL, mid → ask for BUY).
     spread_lookup: dict[int, float] = {}
-    try:
-        metrics = client.get_metrics(slug, bt_start.isoformat(), bt_end.isoformat(), resolution)
-        for m in metrics:
-            ts_m = _parse_ts(m.get("ts") or m.get("t", 0))
-            sprd = m.get("spread")
-            if sprd is not None:
-                spread_lookup[ts_m] = float(sprd) / 2.0
-    except PMDError:
-        pass  # fall back to fixed half_spread for all bars
+    if use_metrics_spread:
+        try:
+            metrics = client.get_metrics(slug, bt_start.isoformat(), bt_end.isoformat(), resolution)
+            for m in metrics:
+                ts_m = _parse_ts(m.get("ts") or m.get("t", 0))
+                sprd = m.get("spread")
+                if sprd is not None:
+                    spread_lookup[ts_m] = float(sprd) / 2.0
+        except PMDError:
+            pass  # fall back to fixed half_spread for all bars
 
     # Classify the resolution outcome from the tail
     resolution_outcome, resolution_price = _determine_resolution(prices)
@@ -321,6 +325,12 @@ def scan_market(
 
     trades: list[LongshotTrade] = []
     for _idx, ts, zone, signal in entries:
+        if max_days_left is not None and resolution_end is not None:
+            entry_dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+            days_left = (resolution_end - entry_dt).total_seconds() / 86400.0
+            if days_left > max_days_left:
+                continue
+
         entry_price = analysis_prices[_idx]
 
         # Actual half-spread at this bar, or fall back to the fixed assumption.
@@ -609,6 +619,9 @@ def parse_args() -> argparse.Namespace:
                    help="Max resolved markets to scan (default: 200)")
     p.add_argument("--window",   type=int,   default=89,
                    help="Price history window per market in days (default: 89)")
+    p.add_argument("--max-days-left", type=float, default=None,
+                   help="Only keep entries with at most this many days to resolution "
+                        "(default: no max cap)")
     p.add_argument("--res",      default="1h",
                    choices=["10m", "1h", "6h"],
                    help="Price bar resolution (default: 1h)")
@@ -627,6 +640,8 @@ def parse_args() -> argparse.Namespace:
                    help="Half bid-ask spread subtracted from each trade's P&L to model "
                         "execution cost (default: 0.01 = 1 pp). SELL signals execute at "
                         "bid = mid − half_spread.")
+    p.add_argument("--skip-metrics", action="store_true",
+                   help="Do not fetch /metrics spread data; use fixed --half-spread for all trades")
     p.add_argument("--verbose",  action="store_true",
                    help="Print per-market progress")
     p.add_argument("--csv",      default=None,
@@ -647,13 +662,18 @@ def main() -> None:
     print(f"Longshot Bias Backtest — Hold-to-Resolution")
     print(f"Resolved window  : {resolved_since.date()} → {now.date()} ({args.days}d)")
     print(f"Price history    : up to {args.window}d per market  @ {args.res}")
+    if args.max_days_left is None:
+        print("Max days-left    : none")
+    else:
+        print(f"Max days-left    : {args.max_days_left:g}d")
     print(f"Universe size    : {args.universe} markets")
     print(f"Thresholds       : longshot ≤ {args.longshot}  |  favorite ≥ {args.favorite}")
     entry_mode = "first entry per market" if args.first_entry_only else "all zone entries"
     signal_mode = "SELL only" if args.sell_only else "SELL + BUY"
     print(f"Entry mode       : {entry_mode}  |  signals: {signal_mode}")
     print(f"Sports filter    : {'on (skip live-game markets)' if args.no_sports else 'off'}")
-    print(f"Half-spread      : {args.half_spread:.3f}  (execution cost per trade)")
+    spread_mode = "fixed (metrics disabled)" if args.skip_metrics else "metrics-derived when available"
+    print(f"Half-spread      : {args.half_spread:.3f}  (execution cost per trade, {spread_mode})")
     print()
 
     # ── Step 1: fetch resolved market list ──────────────────────────────────
@@ -705,6 +725,9 @@ def main() -> None:
                 favorite_threshold=args.favorite,
                 first_entry_only=args.first_entry_only,
                 half_spread=args.half_spread,
+                max_days_left=args.max_days_left,
+                resolution_end=end_date,
+                use_metrics_spread=not args.skip_metrics,
             )
         except PMDError as e:
             if e.status_code == 403:

@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # AWS KMS (for wallet encryption)
     kms_key_id: str = ""  # KMS key ARN for envelope encryption
 
+    # Local dev encryption key (only used when KMS is not configured)
+    local_encryption_key: str = "dev-local-encryption-key-32bytes"
+
     # Signer service
     signer_url: str = "http://signer:8001"
     signer_shared_secret: str = "CHANGE_ME_IN_PRODUCTION"

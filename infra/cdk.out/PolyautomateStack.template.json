@@ -356,7 +356,7 @@
     "Description": "Executor runtime credentials for Polymarket trading",
     "GenerateSecretString": {
      "GenerateStringKey": "bootstrap",
-     "SecretStringTemplate": "{\"POLYMARKET_API_KEY\":\"REPLACE_ME\",\"POLYMARKET_PASSPHRASE\":\"REPLACE_ME\",\"POLYMARKET_SIGNING_KEY\":\"REPLACE_ME\"}"
+     "SecretStringTemplate": "{\"POLYMARKET_API_KEY\":\"REPLACE_ME\",\"POLYMARKET_PASSPHRASE\":\"REPLACE_ME\",\"POLYMARKET_SIGNING_KEY\":\"REPLACE_ME\",\"POLYMARKET_PRIVATE_KEY\":\"REPLACE_ME\",\"POLYMARKET_ADDRESS\":\"REPLACE_ME\",\"POLYMARKET_SIGNER_ADDRESS\":\"REPLACE_ME\",\"POLYMARKETDATA_API_KEY\":\"REPLACE_ME\",\"TELEGRAM_BOT_TOKEN\":\"REPLACE_ME\",\"TELEGRAM_CHAT_ID\":\"REPLACE_ME\",\"EXECUTOR_GITHUB_TOKEN\":\"REPLACE_ME\"}"
     }
    },
    "UpdateReplacePolicy": "Delete",
@@ -371,7 +371,7 @@
     "Description": "Researcher runtime credentials for Claude and PolymarketData",
     "GenerateSecretString": {
      "GenerateStringKey": "bootstrap",
-     "SecretStringTemplate": "{\"ANTHROPIC_API_KEY\":\"REPLACE_ME\",\"POLYMARKETDATA_API_KEY\":\"REPLACE_ME\",\"TELEGRAM_BOT_TOKEN\":\"REPLACE_ME\",\"TELEGRAM_CHAT_ID\":\"REPLACE_ME\"}"
+     "SecretStringTemplate": "{\"ANTHROPIC_API_KEY\":\"REPLACE_ME\",\"POLYMARKETDATA_API_KEY\":\"REPLACE_ME\",\"TELEGRAM_BOT_TOKEN\":\"REPLACE_ME\",\"TELEGRAM_CHAT_ID\":\"REPLACE_ME\",\"GITHUB_TOKEN\":\"REPLACE_ME\"}"
     }
    },
    "UpdateReplacePolicy": "Delete",
@@ -513,18 +513,6 @@
         {
          "Ref": "AWS::Partition"
         },
-        ":iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-       ]
-      ]
-     },
-     {
-      "Fn::Join": [
-       "",
-       [
-        "arn:",
-        {
-         "Ref": "AWS::Partition"
-        },
         ":iam::aws:policy/CloudWatchAgentServerPolicy"
        ]
       ]
@@ -589,7 +577,7 @@
     "aws:cdk:path": "PolyautomateStack/ExecutorInstanceRole/DefaultPolicy/Resource"
    }
   },
-  "ExecutorHostInstanceV2InstanceProfileF7FCF868": {
+  "ExecutorHostInstanceV3InstanceProfileCFA81F87": {
    "Type": "AWS::IAM::InstanceProfile",
    "Properties": {
     "Roles": [
@@ -599,10 +587,10 @@
     ]
    },
    "Metadata": {
-    "aws:cdk:path": "PolyautomateStack/ExecutorHostInstanceV2/InstanceProfile"
+    "aws:cdk:path": "PolyautomateStack/ExecutorHostInstanceV3/InstanceProfile"
    }
   },
-  "ExecutorHostInstanceV23958C3B9": {
+  "ExecutorHostInstanceV37643D472": {
    "Type": "AWS::EC2::Instance",
    "Properties": {
     "AvailabilityZone": {
@@ -614,17 +602,17 @@
      ]
     },
     "IamInstanceProfile": {
-     "Ref": "ExecutorHostInstanceV2InstanceProfileF7FCF868"
+     "Ref": "ExecutorHostInstanceV3InstanceProfileCFA81F87"
     },
     "ImageId": {
      "Ref": "SsmParameterValueawsserviceamiamazonlinuxlatestal2023amikernel61x8664C96584B6F00A464EAD1953AFF4B05118Parameter"
     },
     "InstanceType": "t3.micro",
     "LaunchTemplate": {
-     "LaunchTemplateName": "ExecutorHostInstanceV2LaunchTemplate",
+     "LaunchTemplateName": "ExecutorHostInstanceV3LaunchTemplate",
      "Version": {
       "Fn::GetAtt": [
-       "ExecutorHostInstanceV2LaunchTemplate4F7A5BDC",
+       "ExecutorHostInstanceV3LaunchTemplate12E1DFDF",
        "LatestVersionNumber"
       ]
      }
@@ -643,7 +631,7 @@
     "Tags": [
      {
       "Key": "Name",
-      "Value": "PolyautomateStack/ExecutorHostInstanceV2"
+      "Value": "PolyautomateStack/ExecutorHostInstanceV3"
      }
     ],
     "UserData": {
@@ -651,65 +639,23 @@
       "Fn::Join": [
        "",
        [
-        "#!/bin/bash\ndnf update -y\ndnf install -y docker awscli\nsystemctl enable docker\nsystemctl start docker\nREGION=",
+        "#!/bin/bash\ndnf update -y\ndnf install -y docker awscli cronie git\nsystemctl enable docker\nsystemctl start docker\nsystemctl enable crond\nsystemctl start crond\nREGION=",
         {
          "Ref": "AWS::Region"
         },
-        "\nACCOUNT_ID=",
+        "\ncat > /usr/local/bin/reconcile-executor.sh <<'SCRIPT'\n#!/usr/bin/env bash\nset -euo pipefail\nREGION=\"${REGION:-eu-west-1}\"\nSECRET_ARN=\"${SECRET_ARN:-}\"\nREPO_URL=\"${REPO_URL:-}\"\nREPO_BRANCH=\"${REPO_BRANCH:-main}\"\nREPO_DIR=\"${REPO_DIR:-/opt/polyautomate-src}\"\nSTATE_DIR=\"/var/lib/polyautomate\"\nLOG_GROUP=\"${LOG_GROUP:-/polyautomate/executor}\"\nPOLL_SECONDS=\"${POLL_SECONDS:-30}\"\nSTRATEGY_RUNNER=\"${STRATEGY_RUNNER:-polyautomate.runtime.example_strategy:run_once}\"\nPOLYMARKET_SIGNATURE_TYPE=\"${POLYMARKET_SIGNATURE_TYPE:-1}\"\nGITHUB_TOKEN=\"${GITHUB_TOKEN:-}\"\n\nif [[ -z \"$SECRET_ARN\" || -z \"$REPO_URL\" ]]; then\n  echo \"missing_required_env\"\n  exit 1\nfi\n\nSECRET_JSON=\"$(aws secretsmanager get-secret-value --region \"$REGION\" --secret-id \"$SECRET_ARN\" --query SecretString --output text)\"\nPOLYMARKET_API_KEY=\"$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_API_KEY\", \"\"))')\"\nPOLYMARKET_PASSPHRASE=\"$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_PASSPHRASE\", \"\"))')\"\nPOLYMARKET_SIGNING_KEY=\"$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_SIGNING_KEY\", \"\"))')\"\nPOLYMARKET_PRIVATE_KEY=\"$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_PRIVATE_KEY\", \"\"))')\"\nPOLYMARKET_ADDRESS=\"$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_ADDRESS\", \"\"))')\"\nPOLYMARKET_SIGNER_ADDRESS=\"$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_SIGNER_ADDRESS\", \"\"))')\"\nPOLYMARKETDATA_API_KEY=\"$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKETDATA_API_KEY\", \"\"))')\"\nTELEGRAM_BOT_TOKEN=\"$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"TELEGRAM_BOT_TOKEN\", \"\"))')\"\nTELEGRAM_CHAT_ID=\"$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"TELEGRAM_CHAT_ID\", \"\"))')\"\nGITHUB_TOKEN=\"$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"EXECUTOR_GITHUB_TOKEN\", \"\"))')\"\nif [[ \"$GITHUB_TOKEN\" == \"REPLACE_ME\" || \"$GITHUB_TOKEN\" == \"null\" ]]; then\n  GITHUB_TOKEN=\"\"\nfi\n\nmkdir -p \"$STATE_DIR\"\n\nAUTH_REPO_URL=\"$REPO_URL\"\nif [[ -n \"$GITHUB_TOKEN\" && \"$REPO_URL\" == https://github.com/* ]]; then\n  AUTH_REPO_URL=\"${REPO_URL/https:\\/\\/github.com\\//https:\\/\\/x-access-token:${GITHUB_TOKEN}@github.com\\/}\"\nfi\n\nif [[ ! -d \"$REPO_DIR/.git\" ]]; then\n  rm -rf \"$REPO_DIR\"\n  git clone --depth 1 --branch \"$REPO_BRANCH\" \"$AUTH_REPO_URL\" \"$REPO_DIR\"\nelse\n  git -C \"$REPO_DIR\" remote set-url origin \"$AUTH_REPO_URL\"\n  git -C \"$REPO_DIR\" fetch origin \"$REPO_BRANCH\"\n  git -C \"$REPO_DIR\" checkout \"$REPO_BRANCH\"\n  git -C \"$REPO_DIR\" reset --hard \"origin/$REPO_BRANCH\"\n  git -C \"$REPO_DIR\" clean -fd\nfi\n\nNEW_SHA=\"$(git -C \"$REPO_DIR\" rev-parse HEAD)\"\nSECRET_SIG=\"$(printf '%s' \"$POLYMARKET_API_KEY:$POLYMARKET_PASSPHRASE:$POLYMARKET_SIGNING_KEY:$POLYMARKET_PRIVATE_KEY:$POLYMARKET_ADDRESS:$POLYMARKET_SIGNER_ADDRESS:$POLL_SECONDS:$STRATEGY_RUNNER\" | sha256sum | awk '{print $1}')\"\nDESIRED_SIG=\"$NEW_SHA:$SECRET_SIG\"\nCURRENT_SIG=\"$(cat \"$STATE_DIR/deploy.sig\" 2>/dev/null || true)\"\n\nif [[ \"$DESIRED_SIG\" != \"$CURRENT_SIG\" ]]; then\n  docker build -f \"$REPO_DIR/docker/executor/Dockerfile\" -t \"polyautomate-executor:$NEW_SHA\" \"$REPO_DIR\" >/dev/null\n  docker rm -f polyautomate-executor >/dev/null 2>&1 || true\n  docker run -d --name polyautomate-executor --restart unless-stopped     -e EXECUTOR_MODE=live     -e POLL_SECONDS=\"$POLL_SECONDS\"     -e STRATEGY_RUNNER=\"$STRATEGY_RUNNER\"     -e DRY_RUN=\"$DRY_RUN\"     -e POLYMARKET_API_KEY=\"$POLYMARKET_API_KEY\"     -e POLYMARKET_PASSPHRASE=\"$POLYMARKET_PASSPHRASE\"     -e POLYMARKET_SIGNING_KEY=\"$POLYMARKET_SIGNING_KEY\"     -e POLYMARKET_PRIVATE_KEY=\"$POLYMARKET_PRIVATE_KEY\"     -e POLYMARKET_ADDRESS=\"$POLYMARKET_ADDRESS\"     -e POLYMARKET_SIGNER_ADDRESS=\"$POLYMARKET_SIGNER_ADDRESS\"     -e POLYMARKET_SIGNATURE_TYPE=\"$POLYMARKET_SIGNATURE_TYPE\"     -e POLYMARKETDATA_API_KEY=\"$POLYMARKETDATA_API_KEY\"     -e TELEGRAM_BOT_TOKEN=\"$TELEGRAM_BOT_TOKEN\"     -e TELEGRAM_CHAT_ID=\"$TELEGRAM_CHAT_ID\"     -e LONGSHOT_THRESHOLD=\"$LONGSHOT_THRESHOLD\"     -e LONGSHOT_MIN_DAYS_LEFT=\"$LONGSHOT_MIN_DAYS_LEFT\"     -e LONGSHOT_MAX_SPREAD=\"$LONGSHOT_MAX_SPREAD\"     -e LONGSHOT_MAX_REL_SPREAD=\"$LONGSHOT_MAX_REL_SPREAD\"     -e LONGSHOT_HOLD_GRACE_HOURS=\"$LONGSHOT_HOLD_GRACE_HOURS\"     -e LONGSHOT_ORDER_SIZE=\"$LONGSHOT_ORDER_SIZE\"     -e LONGSHOT_MAX_ACTIONS_PER_CYCLE=\"$LONGSHOT_MAX_ACTIONS_PER_CYCLE\"     -e LONGSHOT_USE_KELLY=\"$LONGSHOT_USE_KELLY\"     -e LONGSHOT_BANKROLL_USD=\"$LONGSHOT_BANKROLL_USD\"     -e LONGSHOT_KELLY_FRACTION=\"$LONGSHOT_KELLY_FRACTION\"     -e LONGSHOT_MAX_BANKROLL_FRACTION=\"$LONGSHOT_MAX_BANKROLL_FRACTION\"     -e LONGSHOT_MIN_NOTIONAL_USD=\"$LONGSHOT_MIN_NOTIONAL_USD\"     -e LONGSHOT_MAX_NOTIONAL_USD=\"$LONGSHOT_MAX_NOTIONAL_USD\"     -e LONGSHOT_GUARDRAIL_ENABLED=\"$LONGSHOT_GUARDRAIL_ENABLED\"     -e LONGSHOT_GUARDRAIL_WINDOW_TRADES=\"$LONGSHOT_GUARDRAIL_WINDOW_TRADES\"     -e LONGSHOT_GUARDRAIL_MIN_TRADES=\"$LONGSHOT_GUARDRAIL_MIN_TRADES\"     -e LONGSHOT_GUARDRAIL_MIN_PNL_USD=\"$LONGSHOT_GUARDRAIL_MIN_PNL_USD\"     -e LONGSHOT_GUARDRAIL_MIN_WIN_RATE=\"$LONGSHOT_GUARDRAIL_MIN_WIN_RATE\"     -e LONGSHOT_GUARDRAIL_COOLDOWN_MIN=\"$LONGSHOT_GUARDRAIL_COOLDOWN_MIN\"     -e SHADOW_STRATEGY_RUNNER=\"$SHADOW_STRATEGY_RUNNER\"     -e SHADOW_DRY_RUN=\"$SHADOW_DRY_RUN\"     -e SHADOW_ENV_OVERRIDES_JSON=\"$SHADOW_ENV_OVERRIDES_JSON\"     --log-driver=awslogs     --log-opt awslogs-region=\"$REGION\"     --log-opt awslogs-group=\"$LOG_GROUP\"     --log-opt awslogs-stream=executor-ec2     \"polyautomate-executor:$NEW_SHA\" >/dev/null\n  echo \"$DESIRED_SIG\" > \"$STATE_DIR/deploy.sig\"\nfi\nSCRIPT\nchmod +x /usr/local/bin/reconcile-executor.sh\necho 'REGION=",
         {
-         "Ref": "AWS::AccountId"
+         "Ref": "AWS::Region"
         },
-        "\nIMAGE_URI=",
-        {
-         "Fn::Select": [
-          4,
-          {
-           "Fn::Split": [
-            ":",
-            {
-             "Fn::GetAtt": [
-              "ExecutorRepoC7F7CF24",
-              "Arn"
-             ]
-            }
-           ]
-          }
-         ]
-        },
-        ".dkr.ecr.",
-        {
-         "Fn::Select": [
-          3,
-          {
-           "Fn::Split": [
-            ":",
-            {
-             "Fn::GetAtt": [
-              "ExecutorRepoC7F7CF24",
-              "Arn"
-             ]
-            }
-           ]
-          }
-         ]
-        },
-        ".",
-        {
-         "Ref": "AWS::URLSuffix"
-        },
-        "/",
-        {
-         "Ref": "ExecutorRepoC7F7CF24"
-        },
-        ":latest\naws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com\ndocker pull $IMAGE_URI\ndocker rm -f polyautomate-executor || true\nSECRET_JSON=$(aws secretsmanager get-secret-value --region $REGION --secret-id ",
+        "' > /etc/polyautomate-executor.env\necho 'SECRET_ARN=",
         {
          "Ref": "ExecutorCredentialsSecretE3494440"
         },
-        " --query SecretString --output text)\nPOLYMARKET_API_KEY=$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_API_KEY\", \"\"))')\nPOLYMARKET_PASSPHRASE=$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_PASSPHRASE\", \"\"))')\nPOLYMARKET_SIGNING_KEY=$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_SIGNING_KEY\", \"\"))')\ndocker run -d --name polyautomate-executor --restart unless-stopped -e EXECUTOR_MODE=live -e POLYMARKET_API_KEY=\"$POLYMARKET_API_KEY\" -e POLYMARKET_PASSPHRASE=\"$POLYMARKET_PASSPHRASE\" -e POLYMARKET_SIGNING_KEY=\"$POLYMARKET_SIGNING_KEY\" --log-driver=awslogs --log-opt awslogs-region=$REGION --log-opt awslogs-group=",
+        "' >> /etc/polyautomate-executor.env\necho 'REPO_URL=https://github.com/giuliovv/polyautomate.git' >> /etc/polyautomate-executor.env\necho 'REPO_BRANCH=main' >> /etc/polyautomate-executor.env\necho 'LOG_GROUP=",
         {
          "Ref": "ExecutorLogGroup0225862E"
         },
-        " --log-opt awslogs-stream=executor-ec2 $IMAGE_URI"
+        "' >> /etc/polyautomate-executor.env\necho 'POLL_SECONDS=30' >> /etc/polyautomate-executor.env\necho 'DRY_RUN=0' >> /etc/polyautomate-executor.env\necho 'STRATEGY_RUNNER=polyautomate.runtime.longshot_executor:run_once' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_THRESHOLD=0.40' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_MIN_DAYS_LEFT=2' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_MAX_SPREAD=0.03' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_MAX_REL_SPREAD=0.15' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_HOLD_GRACE_HOURS=24' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_ORDER_SIZE=5' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_MAX_ACTIONS_PER_CYCLE=1' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_USE_KELLY=1' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_BANKROLL_USD=500' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_KELLY_FRACTION=0.25' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_MAX_BANKROLL_FRACTION=0.03' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_MIN_NOTIONAL_USD=2' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_MAX_NOTIONAL_USD=25' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_GUARDRAIL_ENABLED=1' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_GUARDRAIL_WINDOW_TRADES=12' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_GUARDRAIL_MIN_TRADES=4' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_GUARDRAIL_MIN_PNL_USD=-5' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_GUARDRAIL_MIN_WIN_RATE=0.35' >> /etc/polyautomate-executor.env\necho 'LONGSHOT_GUARDRAIL_COOLDOWN_MIN=180' >> /etc/polyautomate-executor.env\necho 'SHADOW_STRATEGY_RUNNER=' >> /etc/polyautomate-executor.env\necho 'SHADOW_DRY_RUN=1' >> /etc/polyautomate-executor.env\necho 'SHADOW_ENV_OVERRIDES_JSON=' >> /etc/polyautomate-executor.env\nbash -lc 'set -a; source /etc/polyautomate-executor.env; set +a; /usr/local/bin/reconcile-executor.sh'\necho '*/10 * * * * root bash -lc \"set -a; source /etc/polyautomate-executor.env; set +a; /usr/local/bin/reconcile-executor.sh\"' > /etc/cron.d/polyautomate-reconcile\nchmod 644 /etc/cron.d/polyautomate-reconcile\nsystemctl restart crond"
        ]
       ]
      }
@@ -720,10 +666,10 @@
     "ExecutorInstanceRole6182B350"
    ],
    "Metadata": {
-    "aws:cdk:path": "PolyautomateStack/ExecutorHostInstanceV2/Resource"
+    "aws:cdk:path": "PolyautomateStack/ExecutorHostInstanceV3/Resource"
    }
   },
-  "ExecutorHostInstanceV2LaunchTemplate4F7A5BDC": {
+  "ExecutorHostInstanceV3LaunchTemplate12E1DFDF": {
    "Type": "AWS::EC2::LaunchTemplate",
    "Properties": {
     "LaunchTemplateData": {
@@ -731,10 +677,10 @@
       "HttpTokens": "required"
      }
     },
-    "LaunchTemplateName": "ExecutorHostInstanceV2LaunchTemplate"
+    "LaunchTemplateName": "ExecutorHostInstanceV3LaunchTemplate"
    },
    "Metadata": {
-    "aws:cdk:path": "PolyautomateStack/ExecutorHostInstanceV2/LaunchTemplate"
+    "aws:cdk:path": "PolyautomateStack/ExecutorHostInstanceV3/LaunchTemplate"
    }
   },
   "ResearcherClusterC3B3A763": {
@@ -868,6 +814,10 @@
         "Value": "1"
        },
        {
+        "Name": "ENABLE_PR_AUTOMATION",
+        "Value": "1"
+       },
+       {
         "Name": "STATE_BUCKET",
         "Value": {
          "Ref": "ResearcherStateBucket1CAC0A5F"
@@ -876,6 +826,14 @@
        {
         "Name": "STATE_KEY",
         "Value": "researcher/state.json"
+       },
+       {
+        "Name": "GITHUB_REPO",
+        "Value": "giuliovv/polyautomate"
+       },
+       {
+        "Name": "GITHUB_BASE_BRANCH",
+        "Value": "main"
        }
       ],
       "Essential": true,
@@ -994,6 +952,20 @@
             "Ref": "ResearcherCredentialsSecretE874DF3C"
            },
            ":TELEGRAM_CHAT_ID::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "GITHUB_TOKEN",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "ResearcherCredentialsSecretE874DF3C"
+           },
+           ":GITHUB_TOKEN::"
           ]
          ]
         }

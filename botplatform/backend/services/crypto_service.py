@@ -93,7 +93,7 @@ class CryptoService:
         # Generate a random DEK
         dek = os.urandom(32)
         # "Encrypt" the DEK with a local key (in production this would be KMS)
-        local_key = settings.jwt_secret_key.encode()[:32].ljust(32, b"\0")
+        local_key = settings.local_encryption_key.encode()[:32].ljust(32, b"\0")
         encrypted_dek = self._aes_encrypt(local_key, dek)
 
         # Encrypt the data
@@ -103,7 +103,7 @@ class CryptoService:
 
     def _local_decrypt(self, encrypted_data: bytes, encrypted_dek: bytes) -> str:
         """Local decryption for development."""
-        local_key = settings.jwt_secret_key.encode()[:32].ljust(32, b"\0")
+        local_key = settings.local_encryption_key.encode()[:32].ljust(32, b"\0")
         dek = self._aes_decrypt(local_key, encrypted_dek)
         plaintext = self._aes_decrypt(dek, encrypted_data)
         return plaintext.decode()

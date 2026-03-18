@@ -18,7 +18,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-polyauto1-deploy-role-${AWS::AccountId}-${AWS::Region}",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-polyauto1-cfn-exec-role-${AWS::AccountId}-${AWS::Region}",
-        "stackTemplateAssetObjectUrl": "s3://cdk-polyauto1-assets-${AWS::AccountId}-${AWS::Region}/426e2daf530b53cea73b6c3819bad1189ae1c06acd02c54e55c5683be0bab8d6.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-polyauto1-assets-${AWS::AccountId}-${AWS::Region}/e8725ae7202907392b34a36bd9c3b5d00ad27f850f86cdcfc6fcd54b721333a4.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/polyauto1/version",
         "additionalDependencies": [
@@ -196,22 +196,22 @@
             "data": "ExecutorInstanceRoleDefaultPolicy7C46CBE8"
           }
         ],
-        "/PolyautomateStack/ExecutorHostInstanceV2/InstanceProfile": [
+        "/PolyautomateStack/ExecutorHostInstanceV3/InstanceProfile": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "ExecutorHostInstanceV2InstanceProfileF7FCF868"
+            "data": "ExecutorHostInstanceV3InstanceProfileCFA81F87"
           }
         ],
-        "/PolyautomateStack/ExecutorHostInstanceV2/Resource": [
+        "/PolyautomateStack/ExecutorHostInstanceV3/Resource": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "ExecutorHostInstanceV23958C3B9"
+            "data": "ExecutorHostInstanceV37643D472"
           }
         ],
-        "/PolyautomateStack/ExecutorHostInstanceV2/LaunchTemplate": [
+        "/PolyautomateStack/ExecutorHostInstanceV3/LaunchTemplate": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "ExecutorHostInstanceV2LaunchTemplate4F7A5BDC"
+            "data": "ExecutorHostInstanceV3LaunchTemplate12E1DFDF"
           }
         ],
         "/PolyautomateStack/SsmParameterValue:--aws--service--ami-amazon-linux-latest--al2023-ami-kernel-6.1-x86_64:C96584B6-F00A-464E-AD19-53AFF4B05118.Parameter": [
