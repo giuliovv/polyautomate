@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 
 interface Bot {
@@ -158,14 +159,14 @@ export default function BotsPage() {
       ) : (
         <div className="grid gap-4">
           {bots.map((bot) => (
-            <div key={bot.id} className="p-4 border rounded-lg bg-card">
+            <div key={bot.id} className="p-4 border rounded-lg bg-card hover:border-primary/50 transition-colors">
               <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="font-semibold">{bot.name}</h3>
+                <Link href={`/dashboard/bots/${bot.id}`} className="flex-1">
+                  <h3 className="font-semibold hover:text-primary">{bot.name}</h3>
                   <p className="text-sm text-muted-foreground">
                     Strategy: {bot.strategy}
                   </p>
-                </div>
+                </Link>
                 <div className="flex gap-2 items-center">
                   <span
                     className={`text-xs px-2 py-1 rounded ${
@@ -177,7 +178,10 @@ export default function BotsPage() {
                     {bot.status}
                   </span>
                   <button
-                    onClick={() => handleToggle(bot)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleToggle(bot);
+                    }}
                     className={`px-3 py-1 rounded text-sm ${
                       bot.status === 'running'
                         ? 'bg-red-100 text-red-800 hover:bg-red-200'
@@ -186,6 +190,12 @@ export default function BotsPage() {
                   >
                     {bot.status === 'running' ? 'Stop' : 'Start'}
                   </button>
+                  <Link
+                    href={`/dashboard/bots/${bot.id}`}
+                    className="px-3 py-1 rounded text-sm bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                  >
+                    Details
+                  </Link>
                 </div>
               </div>
             </div>

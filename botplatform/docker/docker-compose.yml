@@ -27,8 +27,8 @@ services:
 
   backend:
     build:
-      context: ..
-      dockerfile: docker/backend/Dockerfile
+      context: ../..
+      dockerfile: botplatform/docker/backend/Dockerfile
     ports:
       - "8000:8000"
     environment:
@@ -48,8 +48,8 @@ services:
 
   signer:
     build:
-      context: ..
-      dockerfile: docker/signer/Dockerfile
+      context: ../..
+      dockerfile: botplatform/docker/signer/Dockerfile
     ports:
       - "8001:8001"
     environment:
@@ -64,8 +64,8 @@ services:
 
   executor:
     build:
-      context: ..
-      dockerfile: docker/executor/Dockerfile
+      context: ../..
+      dockerfile: botplatform/docker/executor/Dockerfile
     environment:
       EXECUTOR_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/botplatform
       EXECUTOR_SIGNER_URL: http://signer:8001
@@ -81,8 +81,8 @@ services:
 
   frontend:
     build:
-      context: ../frontend
-      dockerfile: ../docker/frontend/Dockerfile
+      context: ../..
+      dockerfile: botplatform/docker/frontend/Dockerfile
     ports:
       - "3000:3000"
     environment:

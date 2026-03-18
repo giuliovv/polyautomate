@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import get_settings
-from backend.api import auth, users, wallets, bots, trades
+from backend.api import auth, users, wallets, bots, trades, analytics, backtest
 from backend.db.session import engine, Base
 
 settings = get_settings()
@@ -46,6 +46,8 @@ app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
 app.include_router(wallets.router, prefix="/api/v1/wallets", tags=["wallets"])
 app.include_router(bots.router, prefix="/api/v1/bots", tags=["bots"])
 app.include_router(trades.router, prefix="/api/v1/trades", tags=["trades"])
+app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
+app.include_router(backtest.router, prefix="/api/v1/backtest", tags=["backtest"])
 
 
 @app.get("/health")

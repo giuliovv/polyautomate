@@ -9,15 +9,15 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
-COPY pyproject.toml README.md ./
+COPY botplatform/pyproject.toml botplatform/README.md ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir .
 
 # Copy application code
-COPY executor/ executor/
-COPY backend/ backend/
-COPY signer/ signer/
+COPY botplatform/executor/ executor/
+COPY botplatform/backend/ backend/
+COPY botplatform/signer/ signer/
 
 # Default command
 CMD ["python", "-m", "executor.runner"]

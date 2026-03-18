@@ -8,16 +8,27 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy project files
-COPY pyproject.toml README.md ./
+# Copy and install polyautomate package first (from root)
+COPY pyproject.toml README.md /app/polyautomate/
+COPY polyautomate/ /app/polyautomate/polyautomate/
 
-# Install Python dependencies
+# Install polyautomate with backtest dependencies
+WORKDIR /app/polyautomate
+RUN pip install --no-cache-dir ".[backtest]"
+
+# Switch back to main app directory
+WORKDIR /app
+
+# Copy botplatform project files
+COPY botplatform/pyproject.toml botplatform/README.md ./
+
+# Install botplatform dependencies
 RUN pip install --no-cache-dir .
 
 # Copy application code
-COPY backend/ backend/
-COPY signer/ signer/
-COPY executor/ executor/
+COPY botplatform/backend/ backend/
+COPY botplatform/signer/ signer/
+COPY botplatform/executor/ executor/
 
 # Expose port
 EXPOSE 8000

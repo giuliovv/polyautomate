@@ -10,6 +10,7 @@ const navItems = [
   { href: '/dashboard/wallets', label: 'Wallets' },
   { href: '/dashboard/bots', label: 'Bots' },
   { href: '/dashboard/trades', label: 'Trades' },
+  { href: '/dashboard/backtest', label: 'Backtest' },
 ];
 
 export default function DashboardLayout({
@@ -36,7 +37,8 @@ export default function DashboardLayout({
                 href={item.href}
                 className={cn(
                   'block px-3 py-2 rounded-md text-sm mb-1',
-                  pathname === item.href
+                  pathname === item.href ||
+                    (item.href !== '/dashboard' && pathname.startsWith(item.href))
                     ? 'bg-primary text-primary-foreground'
                     : 'hover:bg-accent'
                 )}

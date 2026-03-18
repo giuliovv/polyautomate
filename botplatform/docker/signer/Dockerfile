@@ -9,15 +9,15 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
-COPY pyproject.toml README.md ./
+COPY botplatform/pyproject.toml botplatform/README.md ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir .
 
 # Copy application code
-COPY signer/ signer/
-COPY backend/ backend/
-COPY executor/ executor/
+COPY botplatform/signer/ signer/
+COPY botplatform/backend/ backend/
+COPY botplatform/executor/ executor/
 
 # Expose port
 EXPOSE 8001
