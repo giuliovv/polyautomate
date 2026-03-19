@@ -149,6 +149,9 @@ def _format_failure_telegram(outcome: RunOutcome) -> str:
 
 
 def _run_backtest(workspace_dir: Path) -> int:
+    if os.getenv("ENABLE_BACKTEST", "0") != "1":
+        LOGGER.info("backtest_disabled")
+        return 0
     cmd_str = os.getenv("BACKTEST_CMD", "python examples/basic_usage.py")
     result = subprocess.run(shlex.split(cmd_str), cwd=str(workspace_dir), check=False)
     return result.returncode
@@ -478,6 +481,25 @@ def main() -> None:
             "Researcher detected non-code operational issues.\n"
             + "\n".join(f"- {line}" for line in summary["operational_issue_lines"])
         )
+
+    if os.getenv("NOTIFIER_ONLY", "0") == "1":
+        next_state = {
+            "last_run_at": datetime.now(timezone.utc).isoformat(),
+            "last_action_event_count": len(executed_events),
+            "last_failed_cycle_count": len(failed_events),
+            "last_backtest_rc": 0,
+            "last_claude_rc": 0,
+            "last_pr_url": None,
+            "claude_notes": "Notifier-only mode.",
+        }
+        _save_state(next_state, state_bucket=state_bucket, state_key=state_key)
+        _send_telegram_message(
+            "Researcher notifier run OK.\n"
+            f"Actions(24h)={len(executed_events)}\n"
+            f"FailedCycles(24h)={len(failed_events)}\n"
+            f"Signals={signal_counts}"
+        )
+        return
 
     workspace_dir, _branch_name, _base_branch = _prepare_workspace()
     outcome = _execute_research_cycle(
