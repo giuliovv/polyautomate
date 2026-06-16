@@ -577,12 +577,13 @@ def _place_order_signed(
     min_order_size: float | None = None
 
     with SecureClient.create(private_key=private_key, wallet=funder, credentials=creds) as client:
+        tick_size = None
         try:
             book = client.get_order_book(token_id=token_id)
-            if book.min_order_size is not None:
-                min_order_size = float(book.min_order_size)
+            min_order_size = float(book.min_order_size)
+            tick_size = book.tick_size
         except Exception:
-            LOGGER.exception("min_order_size_fetch_failed token_id=%s", token_id)
+            LOGGER.exception("order_book_fetch_failed token_id=%s", token_id)
 
         effective_min_size = fallback_min_size
         if min_order_size is not None:
@@ -593,6 +594,11 @@ def _place_order_signed(
         if submitted_size < effective_min_size:
             submitted_size = effective_min_size
             clamped = True
+
+        # Round price to tick size decimal places — new SDK validates but does not auto-round
+        from decimal import Decimal as _D
+        if tick_size is not None:
+            price = float(_D(str(price)).quantize(tick_size))
 
         used_taker_fallback = False
         allow_taker_fallback = os.getenv("LONGSHOT_ALLOW_TAKER_FALLBACK", "1") == "1"
