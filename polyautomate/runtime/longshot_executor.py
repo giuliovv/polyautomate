@@ -565,9 +565,9 @@ def _place_order_signed(
     funder: str,
     signature_type: int,
 ) -> tuple[str, str, float, float | None, bool, bool]:
-    from polymarket import AcceptedOrder, ApiKeyCreds, OrderSide, RejectedOrder, SecureClient
+    from polymarket import AcceptedOrder, ApiKeyCreds, RejectedOrder, SecureClient
 
-    order_side = OrderSide.BUY if side.lower() == "buy" else OrderSide.SELL
+    order_side = "BUY" if side.lower() == "buy" else "SELL"
     creds = ApiKeyCreds.model_validate(
         {"apiKey": api_key, "secret": api_secret, "passphrase": api_passphrase}
     )
