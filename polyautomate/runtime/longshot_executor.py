@@ -40,6 +40,32 @@ _SPORTS_KEYWORDS = (
     "spread:",
 )
 
+_CRYPTO_KEYWORDS = (
+    "bitcoin",
+    "ethereum",
+    " btc ",
+    " eth ",
+    "solana",
+    "dogecoin",
+    " doge ",
+    " xrp ",
+    "ripple",
+    " bnb ",
+    "cardano",
+    " ada ",
+    "avalanche",
+    " avax ",
+    "polygon",
+    " matic ",
+    "litecoin",
+    " ltc ",
+    "crypto",
+    "defi",
+    " nft",
+    "all-time high",
+    "all time high",
+)
+
 
 @dataclass
 class Candidate:
@@ -67,6 +93,11 @@ class SizingDecision:
 def _is_sports_market(question: str) -> bool:
     q = question.lower()
     return any(kw in q for kw in _SPORTS_KEYWORDS)
+
+
+def _is_crypto_market(question: str) -> bool:
+    q = question.lower()
+    return any(kw in q for kw in _CRYPTO_KEYWORDS)
 
 
 def _parse_dt(raw: object) -> datetime | None:
@@ -314,6 +345,8 @@ def _scan_candidates(
 
         question = str(market.get("question", ""))
         if _is_sports_market(question):
+            continue
+        if _is_crypto_market(question):
             continue
 
         end_date = _parse_dt(
