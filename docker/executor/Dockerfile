@@ -8,7 +8,7 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY polyautomate ./polyautomate
 
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --pre .
 
 COPY docker/executor/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

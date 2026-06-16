@@ -565,84 +565,71 @@ def _place_order_signed(
     funder: str,
     signature_type: int,
 ) -> tuple[str, str, float, float | None, bool, bool]:
-    from py_clob_client.client import ClobClient
-    from py_clob_client.clob_types import ApiCreds, OrderArgs, OrderType
-    from py_clob_client.exceptions import PolyApiException
-    from py_clob_client.order_builder.constants import BUY, SELL
+    from polymarket import AcceptedOrder, ApiKeyCreds, OrderSide, RejectedOrder, SecureClient
 
-    buy_side = BUY if side.lower() == "buy" else SELL
-    client = ClobClient(
-        "https://clob.polymarket.com",
-        chain_id=137,
-        key=private_key,
-        signature_type=signature_type,
-        funder=funder,
-    )
-    client.set_api_creds(
-        ApiCreds(
-            api_key=api_key,
-            api_secret=api_secret,
-            api_passphrase=api_passphrase,
-        )
+    order_side = OrderSide.BUY if side.lower() == "buy" else OrderSide.SELL
+    creds = ApiKeyCreds.model_validate(
+        {"apiKey": api_key, "secret": api_secret, "passphrase": api_passphrase}
     )
 
     requested_size = max(size, 0.0)
     fallback_min_size = float(os.getenv("LONGSHOT_MIN_ORDER_SIZE_SHARES", "5"))
     min_order_size: float | None = None
-    try:
-        book = client.get_order_book(token_id)
-        raw_min = getattr(book, "min_order_size", None)
-        if raw_min is None and isinstance(book, dict):
-            raw_min = book.get("min_order_size")
-        if raw_min is not None:
-            min_order_size = float(raw_min)
-    except Exception:
-        LOGGER.exception("min_order_size_fetch_failed token_id=%s", token_id)
 
-    effective_min_size = fallback_min_size
-    if min_order_size is not None:
-        effective_min_size = max(effective_min_size, min_order_size)
+    with SecureClient.create(private_key=private_key, wallet=funder, credentials=creds) as client:
+        try:
+            book = client.get_order_book(token_id=token_id)
+            if book.min_order_size is not None:
+                min_order_size = float(book.min_order_size)
+        except Exception:
+            LOGGER.exception("min_order_size_fetch_failed token_id=%s", token_id)
 
-    submitted_size = requested_size
-    clamped = False
-    if submitted_size < effective_min_size:
-        submitted_size = effective_min_size
-        clamped = True
+        effective_min_size = fallback_min_size
+        if min_order_size is not None:
+            effective_min_size = max(effective_min_size, min_order_size)
 
-    signed_order = client.create_order(
-        OrderArgs(
+        submitted_size = requested_size
+        clamped = False
+        if submitted_size < effective_min_size:
+            submitted_size = effective_min_size
+            clamped = True
+
+        used_taker_fallback = False
+        allow_taker_fallback = os.getenv("LONGSHOT_ALLOW_TAKER_FALLBACK", "1") == "1"
+
+        response = client.place_limit_order(
             token_id=token_id,
             price=price,
             size=submitted_size,
-            side=buy_side,
+            side=order_side,
+            post_only=True,
         )
-    )
-    used_taker_fallback = False
-    allow_taker_fallback = os.getenv("LONGSHOT_ALLOW_TAKER_FALLBACK", "1") == "1"
-    try:
-        response: Any = client.post_order(signed_order, OrderType.GTC, post_only=True)
-    except PolyApiException as exc:
-        err = str(exc).lower()
-        crosses_book = "invalid post-only order: order crosses book" in err or "crosses the book" in err
-        if not (allow_taker_fallback and crosses_book):
-            raise
-        LOGGER.warning(
-            "post_only_crosses_book token_id=%s side=%s price=%.4f size=%.4f — retrying with post_only=false",
-            token_id,
-            side,
-            price,
-            submitted_size,
-        )
-        response = client.post_order(signed_order, OrderType.GTC, post_only=False)
-        used_taker_fallback = True
 
-    order_id = ""
-    status = "submitted"
-    if isinstance(response, dict):
-        order_id = (
-            str(response.get("orderID") or response.get("orderId") or response.get("id") or "")
-        )
-        status = str(response.get("status", status))
+        if isinstance(response, RejectedOrder) and response.code == "post_only_would_cross":
+            if allow_taker_fallback:
+                LOGGER.warning(
+                    "post_only_crosses_book token_id=%s side=%s price=%.4f size=%.4f — retrying with post_only=false",
+                    token_id,
+                    side,
+                    price,
+                    submitted_size,
+                )
+                response = client.place_limit_order(
+                    token_id=token_id,
+                    price=price,
+                    size=submitted_size,
+                    side=order_side,
+                    post_only=False,
+                )
+                used_taker_fallback = True
+            else:
+                raise RuntimeError(f"Order rejected (post_only_would_cross): {response.message}")
+        elif isinstance(response, RejectedOrder):
+            raise RuntimeError(f"Order rejected ({response.code}): {response.message}")
+
+        order_id = response.order_id if isinstance(response, AcceptedOrder) else ""
+        status = str(response.status) if isinstance(response, AcceptedOrder) else "rejected"
+
     return order_id, status, submitted_size, effective_min_size, clamped, used_taker_fallback
 
 
