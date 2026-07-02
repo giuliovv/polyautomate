@@ -6,6 +6,9 @@ All Polymarket API calls are mocked — no real credentials required.
 from __future__ import annotations
 
 import os
+import sys
+import types
+from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,6 +16,7 @@ import pytest
 from polyautomate.runtime.longshot_executor import (
     _compute_order_size,
     _fetch_usdc_balance,
+    _place_order_signed,
 )
 
 
@@ -23,8 +27,9 @@ from polyautomate.runtime.longshot_executor import (
 _VALID_CREDS = {
     "POLYMARKET_API_KEY": "test-key",
     # base64url("testsecret") — valid decodable string
-    "POLYMARKET_SECRET": "dGVzdHNlY3JldA==",
+    "POLYMARKET_SIGNING_KEY": "dGVzdHNlY3JldA==",
     "POLYMARKET_PASSPHRASE": "test-passphrase",
+    "POLYMARKET_ADDRESS": "0x0000000000000000000000000000000000000001",
 }
 
 
@@ -34,6 +39,75 @@ def _mock_response(json_body, status_code=200):
     resp.text = str(json_body)
     resp.json.return_value = json_body
     return resp
+
+
+class _FakeAcceptedOrder:
+    def __init__(self, order_id="order-1", status="live"):
+        self.order_id = order_id
+        self.status = status
+
+
+class _FakeRejectedOrder:
+    def __init__(self, code, message):
+        self.code = code
+        self.message = message
+
+
+class _FakeApiKeyCreds:
+    @classmethod
+    def model_validate(cls, payload):
+        return payload
+
+
+class _FakeBook:
+    min_order_size = "5"
+    tick_size = Decimal("0.01")
+
+
+class _FakeSecureClientFactory:
+    def __init__(self, client):
+        self.client = client
+
+    def create(self, **_kwargs):
+        return self.client
+
+
+class _FakeSecureClient:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.place_calls = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def get_order_book(self, token_id):
+        return _FakeBook()
+
+    def place_limit_order(self, **kwargs):
+        self.place_calls.append(kwargs)
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+
+class _FakeRequestRejectedError(Exception):
+    pass
+
+
+def _install_fake_polymarket(monkeypatch, client):
+    polymarket_mod = types.SimpleNamespace(
+        AcceptedOrder=_FakeAcceptedOrder,
+        ApiKeyCreds=_FakeApiKeyCreds,
+        RejectedOrder=_FakeRejectedOrder,
+        SecureClient=_FakeSecureClientFactory(client),
+    )
+    errors_mod = types.SimpleNamespace(RequestRejectedError=_FakeRequestRejectedError)
+    monkeypatch.setitem(sys.modules, "polymarket", polymarket_mod)
+    monkeypatch.setitem(sys.modules, "polymarket.errors", errors_mod)
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +193,12 @@ class TestFetchUsdcBalance:
     # --- missing credentials ---
 
     def test_missing_all_credentials_returns_none(self):
-        no_creds = {"POLYMARKET_API_KEY": "", "POLYMARKET_SECRET": "", "POLYMARKET_PASSPHRASE": ""}
+        no_creds = {
+            "POLYMARKET_API_KEY": "",
+            "POLYMARKET_SIGNING_KEY": "",
+            "POLYMARKET_PASSPHRASE": "",
+            "POLYMARKET_ADDRESS": "",
+        }
         with patch.dict(os.environ, no_creds, clear=False), \
              patch("polyautomate.runtime.longshot_executor.requests.get") as mock_get:
             result = _fetch_usdc_balance()
@@ -127,7 +206,7 @@ class TestFetchUsdcBalance:
         mock_get.assert_not_called()
 
     def test_missing_secret_returns_none(self):
-        creds = {**_VALID_CREDS, "POLYMARKET_SECRET": ""}
+        creds = {**_VALID_CREDS, "POLYMARKET_SIGNING_KEY": ""}
         with patch.dict(os.environ, creds, clear=False), \
              patch("polyautomate.runtime.longshot_executor.requests.get") as mock_get:
             result = _fetch_usdc_balance()
@@ -139,7 +218,7 @@ class TestFetchUsdcBalance:
         # string like "!!!not-base64!!!" will still "decode" to garbage bytes.
         # The function should make the request (with a garbage signature), get
         # an unrecognised response shape, and return None without crashing.
-        creds = {**_VALID_CREDS, "POLYMARKET_SECRET": "!!!not-base64!!!"}
+        creds = {**_VALID_CREDS, "POLYMARKET_SIGNING_KEY": "!!!not-base64!!!"}
         with patch.dict(os.environ, creds, clear=False), \
              patch("polyautomate.runtime.longshot_executor.requests.get",
                    return_value=_mock_response({"unrecognised_key": "10.0"})):
@@ -173,6 +252,78 @@ class TestFetchUsdcBalance:
         assert "/balance-allowance" in url
         params = call_kwargs.get("params", {})
         assert params.get("asset_type") == "COLLATERAL"
+
+
+# ---------------------------------------------------------------------------
+# _place_order_signed — post-only configuration
+# ---------------------------------------------------------------------------
+
+class TestPlaceOrderSigned:
+    BASE_ENV = {
+        "LONGSHOT_MIN_ORDER_SIZE_SHARES": "5",
+        "LONGSHOT_ALLOW_TAKER_FALLBACK": "1",
+    }
+
+    def _place(self, monkeypatch, client, extra_env=None):
+        env = dict(self.BASE_ENV)
+        if extra_env:
+            env.update(extra_env)
+        _install_fake_polymarket(monkeypatch, client)
+        with patch.dict(os.environ, env, clear=False):
+            return _place_order_signed(
+                token_id="token-1",
+                side="buy",
+                price=0.711,
+                size=2.0,
+                api_key="api",
+                api_secret="secret",
+                api_passphrase="pass",
+                private_key="pk",
+                funder="wallet",
+                signature_type=1,
+            )
+
+    def test_default_places_non_post_only_order(self, monkeypatch):
+        client = _FakeSecureClient([_FakeAcceptedOrder()])
+
+        order_id, status, submitted_size, min_order_size, clamped, taker_fallback = self._place(
+            monkeypatch,
+            client,
+        )
+
+        assert order_id == "order-1"
+        assert status == "live"
+        assert submitted_size == pytest.approx(5.0)
+        assert min_order_size == pytest.approx(5.0)
+        assert clamped is True
+        assert taker_fallback is False
+        assert client.place_calls == [
+            {
+                "token_id": "token-1",
+                "price": 0.71,
+                "size": 5.0,
+                "side": "BUY",
+                "post_only": False,
+            }
+        ]
+
+    def test_explicit_post_only_retries_as_taker_on_crossing_error(self, monkeypatch):
+        client = _FakeSecureClient(
+            [
+                _FakeRequestRejectedError("invalid post-only order: order crosses book"),
+                _FakeAcceptedOrder(order_id="order-2"),
+            ]
+        )
+
+        order_id, _, _, _, _, taker_fallback = self._place(
+            monkeypatch,
+            client,
+            extra_env={"LONGSHOT_POST_ONLY": "1"},
+        )
+
+        assert order_id == "order-2"
+        assert taker_fallback is True
+        assert [call["post_only"] for call in client.place_calls] == [True, False]
 
 
 # ---------------------------------------------------------------------------
@@ -261,13 +412,14 @@ class TestRunOnceBalanceGuard:
         "LONGSHOT_MIN_NOTIONAL_USD": "2",
         "LONGSHOT_BANKROLL_USD": "500",
         "LONGSHOT_STATE_PATH": "/tmp/test-longshot-state.json",
+        "POLYMARKET_PASSPHRASE": "test-passphrase",
+        "POLYMARKET_ADDRESS": "0x0000000000000000000000000000000000000001",
     }
 
     def _run(self, balance_return, extra_env=None):
         """
         Run run_once() with:
         - _fetch_usdc_balance patched to return balance_return
-        - PolymarketTradingClient instantiation patched (no real signing)
         - PMDClient patched to return empty market list (no candidates)
         - State I/O patched to avoid filesystem access
         """
@@ -278,7 +430,6 @@ class TestRunOnceBalanceGuard:
             env.update(extra_env)
 
         with patch.dict(os.environ, env, clear=False), \
-             patch.object(mod, "PolymarketTradingClient") as mock_trader_cls, \
              patch.object(mod, "_fetch_usdc_balance", return_value=balance_return), \
              patch.object(mod, "PMDClient") as mock_pmd_cls, \
              patch.object(mod, "_load_state", return_value={}), \

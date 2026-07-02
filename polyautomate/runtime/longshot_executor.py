@@ -90,6 +90,14 @@ class SizingDecision:
     applied_fraction: float | None = None
 
 
+def _longshot_post_only_enabled() -> bool:
+    return os.getenv("LONGSHOT_POST_ONLY", "0") == "1"
+
+
+def _is_post_only_cross_error(exc: Exception) -> bool:
+    return "post-only" in str(exc).lower() and "cross" in str(exc).lower()
+
+
 def _is_sports_market(question: str) -> bool:
     q = question.lower()
     return any(kw in q for kw in _SPORTS_KEYWORDS)
@@ -599,6 +607,7 @@ def _place_order_signed(
     signature_type: int,
 ) -> tuple[str, str, float, float | None, bool, bool]:
     from polymarket import AcceptedOrder, ApiKeyCreds, RejectedOrder, SecureClient
+    from polymarket.errors import RequestRejectedError
 
     order_side = "BUY" if side.lower() == "buy" else "SELL"
     creds = ApiKeyCreds.model_validate(
@@ -635,14 +644,35 @@ def _place_order_signed(
 
         used_taker_fallback = False
         allow_taker_fallback = os.getenv("LONGSHOT_ALLOW_TAKER_FALLBACK", "1") == "1"
+        post_only = _longshot_post_only_enabled()
 
-        response = client.place_limit_order(
-            token_id=token_id,
-            price=price,
-            size=submitted_size,
-            side=order_side,
-            post_only=True,
-        )
+        try:
+            response = client.place_limit_order(
+                token_id=token_id,
+                price=price,
+                size=submitted_size,
+                side=order_side,
+                post_only=post_only,
+            )
+        except RequestRejectedError as exc:
+            if post_only and _is_post_only_cross_error(exc) and allow_taker_fallback:
+                LOGGER.warning(
+                    "post_only_crosses_book token_id=%s side=%s price=%.4f size=%.4f — retrying with post_only=false",
+                    token_id,
+                    side,
+                    price,
+                    submitted_size,
+                )
+                response = client.place_limit_order(
+                    token_id=token_id,
+                    price=price,
+                    size=submitted_size,
+                    side=order_side,
+                    post_only=False,
+                )
+                used_taker_fallback = True
+            else:
+                raise
 
         if isinstance(response, RejectedOrder) and response.code == "post_only_would_cross":
             if allow_taker_fallback:
@@ -872,7 +902,7 @@ def run_once() -> int:
                     f"notional_requested={requested_notional:.2f} notional_submitted={executed_notional:.2f}"
                 )
             LOGGER.info(
-                "order_submitted slug=%s order_id=%s status=%s price=%.4f size=%.4f yes_price=%.4f avg_spread=%.4f rel_spread=%.2f sizing=%s notional=%.2f p_no=%s full_kelly=%s f=%s taker_fallback=%s",
+                "order_submitted slug=%s order_id=%s status=%s price=%.4f size=%.4f yes_price=%.4f avg_spread=%.4f rel_spread=%.2f sizing=%s notional=%.2f p_no=%s full_kelly=%s f=%s post_only=%s taker_fallback=%s",
                 c.slug,
                 order_id,
                 status,
@@ -886,6 +916,7 @@ def run_once() -> int:
                 f"{sizing.no_win_prob:.3f}" if sizing.no_win_prob is not None else "na",
                 f"{sizing.full_kelly:.4f}" if sizing.full_kelly is not None else "na",
                 f"{sizing.applied_fraction:.4f}" if sizing.applied_fraction is not None else "na",
+                _longshot_post_only_enabled(),
                 taker_fallback,
             )
             _send_telegram_message(
@@ -894,6 +925,7 @@ def run_once() -> int:
                 f"order_id={order_id} status={status}\n"
                 f"yes_price={c.yes_price:.4f} no_price={price:.4f}\n"
                 f"size={submitted_size:.4f} notional={executed_notional:.2f}\n"
+                f"post_only={int(_longshot_post_only_enabled())}\n"
                 f"post_only_fallback={int(taker_fallback)}\n"
                 f"kelly_f={f'{sizing.applied_fraction:.4f}' if sizing.applied_fraction is not None else 'na'} "
                 f"p_no={f'{sizing.no_win_prob:.3f}' if sizing.no_win_prob is not None else 'na'}"
