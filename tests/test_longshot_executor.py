@@ -14,8 +14,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from polyautomate.runtime.longshot_executor import (
+    InsufficientBalanceError,
     _compute_order_size,
     _fetch_usdc_balance,
+    _maybe_send_insufficient_balance_notice,
     _place_order_signed,
 )
 
@@ -264,7 +266,7 @@ class TestPlaceOrderSigned:
         "LONGSHOT_ALLOW_TAKER_FALLBACK": "1",
     }
 
-    def _place(self, monkeypatch, client, extra_env=None):
+    def _place(self, monkeypatch, client, extra_env=None, live_bankroll_usd=None):
         env = dict(self.BASE_ENV)
         if extra_env:
             env.update(extra_env)
@@ -281,6 +283,7 @@ class TestPlaceOrderSigned:
                 private_key="pk",
                 funder="wallet",
                 signature_type=1,
+                live_bankroll_usd=live_bankroll_usd,
             )
 
     def test_default_places_non_post_only_order(self, monkeypatch):
@@ -324,6 +327,66 @@ class TestPlaceOrderSigned:
         assert order_id == "order-2"
         assert taker_fallback is True
         assert [call["post_only"] for call in client.place_calls] == [True, False]
+
+    def test_raises_insufficient_balance_below_required_notional(self, monkeypatch):
+        """min order clamps to 5 shares @ 0.71 = $3.55 required; $3.00 isn't enough."""
+        client = _FakeSecureClient([_FakeAcceptedOrder()])
+
+        with pytest.raises(InsufficientBalanceError):
+            self._place(monkeypatch, client, live_bankroll_usd=3.0)
+
+        # The whole point is to not even attempt an order we know will be
+        # rejected — confirm no API call was made.
+        assert client.place_calls == []
+
+    def test_proceeds_when_balance_covers_required_notional(self, monkeypatch):
+        client = _FakeSecureClient([_FakeAcceptedOrder()])
+
+        order_id, *_ = self._place(monkeypatch, client, live_bankroll_usd=4.0)
+
+        assert order_id == "order-1"
+        assert len(client.place_calls) == 1
+
+    def test_no_balance_check_when_live_bankroll_usd_omitted(self, monkeypatch):
+        """Default (None) preserves old behaviour — no check, order proceeds."""
+        client = _FakeSecureClient([_FakeAcceptedOrder()])
+
+        order_id, *_ = self._place(monkeypatch, client)
+
+        assert order_id == "order-1"
+
+
+# ---------------------------------------------------------------------------
+# _maybe_send_insufficient_balance_notice — daily dedup
+# ---------------------------------------------------------------------------
+
+class TestInsufficientBalanceNotice:
+    def test_sends_once_per_day(self):
+        from datetime import datetime, timezone
+        from polyautomate.runtime import longshot_executor as mod
+
+        state: dict = {}
+        now = datetime(2026, 8, 20, 10, 0, tzinfo=timezone.utc)
+
+        with patch.object(mod, "_send_telegram_message") as mock_send:
+            _maybe_send_insufficient_balance_notice(state, now, "balance too low")
+            _maybe_send_insufficient_balance_notice(state, now, "balance too low")
+
+        assert mock_send.call_count == 1
+        assert state["insufficient_balance_notified_day"] == "2026-08-20"
+
+    def test_sends_again_on_a_new_day(self):
+        from datetime import datetime, timezone
+        from polyautomate.runtime import longshot_executor as mod
+
+        state = {"insufficient_balance_notified_day": "2026-08-19"}
+        now = datetime(2026, 8, 20, 10, 0, tzinfo=timezone.utc)
+
+        with patch.object(mod, "_send_telegram_message") as mock_send:
+            _maybe_send_insufficient_balance_notice(state, now, "still too low")
+
+        assert mock_send.call_count == 1
+        assert state["insufficient_balance_notified_day"] == "2026-08-20"
 
 
 # ---------------------------------------------------------------------------

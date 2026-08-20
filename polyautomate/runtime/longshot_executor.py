@@ -19,6 +19,14 @@ from polyautomate.clients.polymarketdata import PMDClient, PMDError
 
 LOGGER = logging.getLogger("longshot_executor")
 
+
+class InsufficientBalanceError(RuntimeError):
+    """Raised when the live wallet balance can't cover even the exchange's
+    minimum order size for a candidate — distinct from a generic order
+    failure so run_once() can skip cleanly (log + notify once/day) instead
+    of retrying the same doomed order every cycle."""
+
+
 _SPORTS_KEYWORDS = (
     "map 1",
     "map 2",
@@ -228,6 +236,23 @@ def _maybe_send_min_size_daily_summary(state: dict, now: datetime) -> None:
         _send_telegram_message(msg)
         reported.add(day_key)
     state["min_size_override_reported_days"] = sorted(reported)
+
+
+def _maybe_send_insufficient_balance_notice(state: dict, now: datetime, detail: str) -> None:
+    """At most one notice per day — the wallet being too low to trade
+    doesn't change cycle to cycle, so re-sending this every ~30s the way
+    the old code effectively did (via a raw exception + traceback every
+    cycle) is just noise, not new information."""
+    today = now.date().isoformat()
+    if state.get("insufficient_balance_notified_day") == today:
+        return
+    _send_telegram_message(
+        "Executor paused: balance too low for minimum order size.\n"
+        f"{detail}\n"
+        "Deposit more USDC to resume — no restart needed, it'll pick back "
+        "up on its own once funded."
+    )
+    state["insufficient_balance_notified_day"] = today
 
 
 def _extract_token_price(market: dict, outcome: str) -> float | None:
@@ -605,6 +630,7 @@ def _place_order_signed(
     private_key: str,
     funder: str,
     signature_type: int,
+    live_bankroll_usd: float | None = None,
 ) -> tuple[str, str, float, float | None, bool, bool]:
     from polymarket import AcceptedOrder, ApiKeyCreds, RejectedOrder, SecureClient
     from polymarket.errors import RequestRejectedError
@@ -641,6 +667,20 @@ def _place_order_signed(
         from decimal import Decimal as _D
         if tick_size is not None:
             price = float(_D(str(price)).quantize(tick_size))
+
+        # The exchange's own minimum order size can require more notional
+        # than the wallet actually holds (min sizes are in shares, not USD,
+        # so this only shows up once price is known) — checking here avoids
+        # attempting an order that's guaranteed to be rejected, and lets
+        # run_once() tell the difference between "this order failed" and
+        # "we can't afford any order right now" (see InsufficientBalanceError).
+        required_notional = submitted_size * price
+        if live_bankroll_usd is not None and required_notional > live_bankroll_usd:
+            raise InsufficientBalanceError(
+                f"required ${required_notional:.2f} for minimum order size "
+                f"{submitted_size:.4f} shares @ {price:.4f}, but live balance "
+                f"is only ${live_bankroll_usd:.2f}"
+            )
 
         used_taker_fallback = False
         allow_taker_fallback = os.getenv("LONGSHOT_ALLOW_TAKER_FALLBACK", "1") == "1"
@@ -866,18 +906,29 @@ def run_once() -> int:
                 f"{sizing.applied_fraction:.4f}" if sizing.applied_fraction is not None else "na",
             )
         else:
-            order_id, status, submitted_size, min_order_size, clamped, taker_fallback = _place_order_signed(
-                token_id=token_id,
-                side=side,
-                price=price,
-                size=order_size,
-                api_key=pm_api_key,
-                api_secret=pm_signing_key,
-                api_passphrase=pm_passphrase,
-                private_key=pm_private_key,
-                funder=pm_address,
-                signature_type=pm_signature_type,
-            )
+            try:
+                order_id, status, submitted_size, min_order_size, clamped, taker_fallback = _place_order_signed(
+                    token_id=token_id,
+                    side=side,
+                    price=price,
+                    size=order_size,
+                    api_key=pm_api_key,
+                    api_secret=pm_signing_key,
+                    api_passphrase=pm_passphrase,
+                    private_key=pm_private_key,
+                    funder=pm_address,
+                    signature_type=pm_signature_type,
+                    live_bankroll_usd=live_bankroll_usd,
+                )
+            except InsufficientBalanceError as exc:
+                # Balance won't change mid-cycle, so every remaining
+                # candidate would fail the same way — stop here rather than
+                # burning an order-book fetch per candidate just to hit the
+                # same wall, and don't let this bubble up as a generic
+                # executor_cycle_failed crash (it isn't one).
+                LOGGER.warning("insufficient_balance_skip slug=%s detail=%s", c.slug, exc)
+                _maybe_send_insufficient_balance_notice(state, now, str(exc))
+                break
             executed_notional = submitted_size * price
             requested_notional = sizing.notional_usd
             target_fraction = None
