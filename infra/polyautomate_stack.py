@@ -5,6 +5,8 @@ from aws_cdk import (
     Duration,
     aws_cloudwatch as cloudwatch,
     aws_cloudwatch_actions as cloudwatch_actions,
+    aws_cloudfront as cloudfront,
+    aws_cloudfront_origins as origins,
     aws_ec2 as ec2,
     aws_ecr as ecr,
     aws_ecs as ecs,
@@ -17,6 +19,7 @@ from aws_cdk import (
     aws_secretsmanager as secretsmanager,
     aws_sns as sns,
     aws_sns_subscriptions as sns_subscriptions,
+    aws_ssm as ssm,
 )
 
 
@@ -86,6 +89,32 @@ class PolyautomateStack(cdk.Stack):
             lifecycle_rules=[s3.LifecycleRule(noncurrent_version_expiration=Duration.days(30))],
             removal_policy=cdk.RemovalPolicy.RETAIN,
             auto_delete_objects=False,
+        )
+
+        portfolio_bucket = s3.Bucket(
+            self,
+            "PortfolioDashboardBucket",
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            enforce_ssl=True,
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+            auto_delete_objects=False,
+        )
+        portfolio_distribution = cloudfront.Distribution(
+            self,
+            "PortfolioDashboardDistribution",
+            default_root_object="index.html",
+            default_behavior=cloudfront.BehaviorOptions(
+                origin=origins.S3BucketOrigin.with_origin_access_control(
+                    portfolio_bucket,
+                    origin_access_levels=[cloudfront.AccessLevel.READ],
+                ),
+                allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+                cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD,
+                cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
+                viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+            ),
+            comment="Read-only Polyautomate portfolio dashboard",
         )
 
         executor_credentials_secret = secretsmanager.Secret(
@@ -180,6 +209,7 @@ class PolyautomateStack(cdk.Stack):
         )
         executor_log_group.grant_write(executor_role)
         executor_credentials_secret.grant_read(executor_role)
+        portfolio_bucket.grant_read_write(executor_role)
 
         executor_instance = ec2.Instance(
             self,
@@ -347,6 +377,63 @@ SCRIPT""",
             "systemctl restart crond",
         )
 
+        ssm.CfnAssociation(
+            self,
+            "PortfolioDashboardPublisherAssociation",
+            name="AWS-RunShellScript",
+            targets=[
+                ssm.CfnAssociation.TargetProperty(
+                    key="InstanceIds",
+                    values=[executor_instance.instance_id],
+                )
+            ],
+            parameters={
+                "commands": [
+                    """cat > /usr/local/bin/publish-portfolio-dashboard.sh <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+REGION="${REGION:-eu-west-1}"
+REPO_DIR="${REPO_DIR:-/opt/polyautomate-src}"
+STATE_DIR="/var/lib/polyautomate"
+PORTFOLIO_BUCKET="${PORTFOLIO_BUCKET:-}"
+
+if [[ -z "$PORTFOLIO_BUCKET" ]]; then
+  echo "portfolio_publish_skipped reason=missing_bucket"
+  exit 0
+fi
+if [[ ! -d "$REPO_DIR" ]]; then
+  echo "portfolio_publish_skipped reason=missing_repo repo_dir=$REPO_DIR"
+  exit 0
+fi
+if ! PYTHONPATH="$REPO_DIR" python3 -c 'import polyautomate.portfolio' >/dev/null 2>&1; then
+  echo "portfolio_publish_skipped reason=portfolio_module_unavailable repo_dir=$REPO_DIR"
+  exit 0
+fi
+
+mkdir -p "$STATE_DIR/portfolio"
+if docker inspect polyautomate-executor >/dev/null 2>&1; then
+  docker cp polyautomate-executor:/var/lib/polyautomate/longshot-state.json "$STATE_DIR/longshot-state.json" >/dev/null 2>&1 || true
+fi
+PYTHONPATH="$REPO_DIR" python3 -m polyautomate.portfolio \
+  --state "$STATE_DIR/longshot-state.json" \
+  --out "$STATE_DIR/portfolio/index.html"
+aws s3 cp "$STATE_DIR/portfolio/index.html" "s3://$PORTFOLIO_BUCKET/index.html" \
+  --region "$REGION" \
+  --cache-control "no-store" \
+  --content-type "text/html; charset=utf-8" \
+  --only-show-errors
+echo "portfolio_published bucket=$PORTFOLIO_BUCKET"
+SCRIPT""",
+                    "chmod +x /usr/local/bin/publish-portfolio-dashboard.sh",
+                    f"cat > /etc/polyautomate-portfolio.env <<'ENV'\nREGION={cdk.Aws.REGION}\nREPO_DIR=/opt/polyautomate-src\nPORTFOLIO_BUCKET={portfolio_bucket.bucket_name}\nPORTFOLIO_DISTRIBUTION_DOMAIN={portfolio_distribution.distribution_domain_name}\nENV",
+                    "echo '* * * * * root bash -lc \"set -a; source /etc/polyautomate-portfolio.env; set +a; /usr/local/bin/publish-portfolio-dashboard.sh\"' > /etc/cron.d/polyautomate-portfolio",
+                    "chmod 644 /etc/cron.d/polyautomate-portfolio",
+                    "systemctl restart crond",
+                    "bash -lc 'set -a; source /etc/polyautomate-portfolio.env; set +a; /usr/local/bin/publish-portfolio-dashboard.sh'",
+                ]
+            },
+        )
+
         cluster = ecs.Cluster(self, "ResearcherCluster", vpc=vpc)
 
         researcher_task_role = iam.Role(
@@ -507,5 +594,11 @@ SCRIPT""",
         CfnOutput(self, "ErrorAlarmName", value=error_alarm.alarm_name)
         CfnOutput(self, "ExecutorErrorTopicArn", value=executor_error_topic.topic_arn)
         CfnOutput(self, "ResearcherStateBucketName", value=researcher_state_bucket.bucket_name)
+        CfnOutput(self, "PortfolioDashboardBucketName", value=portfolio_bucket.bucket_name)
+        CfnOutput(
+            self,
+            "PortfolioDashboardUrl",
+            value=f"https://{portfolio_distribution.distribution_domain_name}",
+        )
         CfnOutput(self, "ExecutorCredentialsSecretArn", value=executor_credentials_secret.secret_arn)
         CfnOutput(self, "ResearcherCredentialsSecretArn", value=researcher_credentials_secret.secret_arn)

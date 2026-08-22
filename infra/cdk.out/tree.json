@@ -544,6 +544,261 @@
               "metadata": []
             }
           },
+          "PortfolioDashboardBucket": {
+            "id": "PortfolioDashboardBucket",
+            "path": "PolyautomateStack/PortfolioDashboardBucket",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "PolyautomateStack/PortfolioDashboardBucket/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::S3::Bucket",
+                  "aws:cdk:cloudformation:props": {
+                    "bucketEncryption": {
+                      "serverSideEncryptionConfiguration": [
+                        {
+                          "serverSideEncryptionByDefault": {
+                            "sseAlgorithm": "AES256"
+                          }
+                        }
+                      ]
+                    },
+                    "publicAccessBlockConfiguration": {
+                      "blockPublicAcls": true,
+                      "blockPublicPolicy": true,
+                      "ignorePublicAcls": true,
+                      "restrictPublicBuckets": true
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_s3.CfnBucket",
+                  "version": "2.183.0"
+                }
+              },
+              "Policy": {
+                "id": "Policy",
+                "path": "PolyautomateStack/PortfolioDashboardBucket/Policy",
+                "children": {
+                  "Resource": {
+                    "id": "Resource",
+                    "path": "PolyautomateStack/PortfolioDashboardBucket/Policy/Resource",
+                    "attributes": {
+                      "aws:cdk:cloudformation:type": "AWS::S3::BucketPolicy",
+                      "aws:cdk:cloudformation:props": {
+                        "bucket": {
+                          "Ref": "PortfolioDashboardBucket3C1405C0"
+                        },
+                        "policyDocument": {
+                          "Statement": [
+                            {
+                              "Action": "s3:*",
+                              "Condition": {
+                                "Bool": {
+                                  "aws:SecureTransport": "false"
+                                }
+                              },
+                              "Effect": "Deny",
+                              "Principal": {
+                                "AWS": "*"
+                              },
+                              "Resource": [
+                                {
+                                  "Fn::GetAtt": [
+                                    "PortfolioDashboardBucket3C1405C0",
+                                    "Arn"
+                                  ]
+                                },
+                                {
+                                  "Fn::Join": [
+                                    "",
+                                    [
+                                      {
+                                        "Fn::GetAtt": [
+                                          "PortfolioDashboardBucket3C1405C0",
+                                          "Arn"
+                                        ]
+                                      },
+                                      "/*"
+                                    ]
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "Action": "s3:GetObject",
+                              "Condition": {
+                                "StringEquals": {
+                                  "AWS:SourceArn": {
+                                    "Fn::Join": [
+                                      "",
+                                      [
+                                        "arn:",
+                                        {
+                                          "Ref": "AWS::Partition"
+                                        },
+                                        ":cloudfront::",
+                                        {
+                                          "Ref": "AWS::AccountId"
+                                        },
+                                        ":distribution/",
+                                        {
+                                          "Ref": "PortfolioDashboardDistributionF187906F"
+                                        }
+                                      ]
+                                    ]
+                                  }
+                                }
+                              },
+                              "Effect": "Allow",
+                              "Principal": {
+                                "Service": "cloudfront.amazonaws.com"
+                              },
+                              "Resource": {
+                                "Fn::Join": [
+                                  "",
+                                  [
+                                    {
+                                      "Fn::GetAtt": [
+                                        "PortfolioDashboardBucket3C1405C0",
+                                        "Arn"
+                                      ]
+                                    },
+                                    "/*"
+                                  ]
+                                ]
+                              }
+                            }
+                          ],
+                          "Version": "2012-10-17"
+                        }
+                      }
+                    },
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.aws_s3.CfnBucketPolicy",
+                      "version": "2.183.0"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_s3.BucketPolicy",
+                  "version": "2.183.0",
+                  "metadata": []
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_s3.Bucket",
+              "version": "2.183.0",
+              "metadata": []
+            }
+          },
+          "PortfolioDashboardDistribution": {
+            "id": "PortfolioDashboardDistribution",
+            "path": "PolyautomateStack/PortfolioDashboardDistribution",
+            "children": {
+              "Origin1": {
+                "id": "Origin1",
+                "path": "PolyautomateStack/PortfolioDashboardDistribution/Origin1",
+                "children": {
+                  "S3OriginAccessControl": {
+                    "id": "S3OriginAccessControl",
+                    "path": "PolyautomateStack/PortfolioDashboardDistribution/Origin1/S3OriginAccessControl",
+                    "children": {
+                      "Resource": {
+                        "id": "Resource",
+                        "path": "PolyautomateStack/PortfolioDashboardDistribution/Origin1/S3OriginAccessControl/Resource",
+                        "attributes": {
+                          "aws:cdk:cloudformation:type": "AWS::CloudFront::OriginAccessControl",
+                          "aws:cdk:cloudformation:props": {
+                            "originAccessControlConfig": {
+                              "name": "PolyautomateStackPortfolioDaOrigin1S3OriginAccessControlE07A5D1B",
+                              "signingBehavior": "always",
+                              "signingProtocol": "sigv4",
+                              "originAccessControlOriginType": "s3"
+                            }
+                          }
+                        },
+                        "constructInfo": {
+                          "fqn": "aws-cdk-lib.aws_cloudfront.CfnOriginAccessControl",
+                          "version": "2.183.0"
+                        }
+                      }
+                    },
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.aws_cloudfront.S3OriginAccessControl",
+                      "version": "2.183.0",
+                      "metadata": []
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "constructs.Construct",
+                  "version": "10.8.1"
+                }
+              },
+              "Resource": {
+                "id": "Resource",
+                "path": "PolyautomateStack/PortfolioDashboardDistribution/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::CloudFront::Distribution",
+                  "aws:cdk:cloudformation:props": {
+                    "distributionConfig": {
+                      "enabled": true,
+                      "origins": [
+                        {
+                          "domainName": {
+                            "Fn::GetAtt": [
+                              "PortfolioDashboardBucket3C1405C0",
+                              "RegionalDomainName"
+                            ]
+                          },
+                          "id": "PolyautomateStackPortfolioDashboardDistributionOrigin11D347239",
+                          "s3OriginConfig": {
+                            "originAccessIdentity": ""
+                          },
+                          "originAccessControlId": {
+                            "Fn::GetAtt": [
+                              "PortfolioDashboardDistributionOrigin1S3OriginAccessControl33792C4F",
+                              "Id"
+                            ]
+                          }
+                        }
+                      ],
+                      "defaultCacheBehavior": {
+                        "pathPattern": "*",
+                        "targetOriginId": "PolyautomateStackPortfolioDashboardDistributionOrigin11D347239",
+                        "allowedMethods": [
+                          "GET",
+                          "HEAD"
+                        ],
+                        "cachedMethods": [
+                          "GET",
+                          "HEAD"
+                        ],
+                        "cachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+                        "compress": true,
+                        "viewerProtocolPolicy": "redirect-to-https"
+                      },
+                      "comment": "Read-only Polyautomate portfolio dashboard",
+                      "defaultRootObject": "index.html",
+                      "httpVersion": "http2",
+                      "ipv6Enabled": true
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cloudfront.CfnDistribution",
+                  "version": "2.183.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_cloudfront.Distribution",
+              "version": "2.183.0",
+              "metadata": []
+            }
+          },
           "ExecutorCredentialsSecret": {
             "id": "ExecutorCredentialsSecret",
             "path": "PolyautomateStack/ExecutorCredentialsSecret",
@@ -905,6 +1160,43 @@
                               "Resource": {
                                 "Ref": "ExecutorCredentialsSecretE3494440"
                               }
+                            },
+                            {
+                              "Action": [
+                                "s3:GetObject*",
+                                "s3:GetBucket*",
+                                "s3:List*",
+                                "s3:DeleteObject*",
+                                "s3:PutObject",
+                                "s3:PutObjectLegalHold",
+                                "s3:PutObjectRetention",
+                                "s3:PutObjectTagging",
+                                "s3:PutObjectVersionTagging",
+                                "s3:Abort*"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": [
+                                {
+                                  "Fn::GetAtt": [
+                                    "PortfolioDashboardBucket3C1405C0",
+                                    "Arn"
+                                  ]
+                                },
+                                {
+                                  "Fn::Join": [
+                                    "",
+                                    [
+                                      {
+                                        "Fn::GetAtt": [
+                                          "PortfolioDashboardBucket3C1405C0",
+                                          "Arn"
+                                        ]
+                                      },
+                                      "/*"
+                                    ]
+                                  ]
+                                }
+                              ]
                             }
                           ],
                           "Version": "2012-10-17"
@@ -1079,6 +1371,63 @@
               "fqn": "aws-cdk-lib.Resource",
               "version": "2.183.0",
               "metadata": []
+            }
+          },
+          "PortfolioDashboardPublisherAssociation": {
+            "id": "PortfolioDashboardPublisherAssociation",
+            "path": "PolyautomateStack/PortfolioDashboardPublisherAssociation",
+            "attributes": {
+              "aws:cdk:cloudformation:type": "AWS::SSM::Association",
+              "aws:cdk:cloudformation:props": {
+                "name": "AWS-RunShellScript",
+                "parameters": {
+                  "commands": [
+                    "cat > /usr/local/bin/publish-portfolio-dashboard.sh <<'SCRIPT'\n#!/usr/bin/env bash\nset -euo pipefail\nREGION=\"${REGION:-eu-west-1}\"\nREPO_DIR=\"${REPO_DIR:-/opt/polyautomate-src}\"\nSTATE_DIR=\"/var/lib/polyautomate\"\nPORTFOLIO_BUCKET=\"${PORTFOLIO_BUCKET:-}\"\n\nif [[ -z \"$PORTFOLIO_BUCKET\" ]]; then\n  echo \"portfolio_publish_skipped reason=missing_bucket\"\n  exit 0\nfi\nif [[ ! -d \"$REPO_DIR\" ]]; then\n  echo \"portfolio_publish_skipped reason=missing_repo repo_dir=$REPO_DIR\"\n  exit 0\nfi\nif ! PYTHONPATH=\"$REPO_DIR\" python3 -c 'import polyautomate.portfolio' >/dev/null 2>&1; then\n  echo \"portfolio_publish_skipped reason=portfolio_module_unavailable repo_dir=$REPO_DIR\"\n  exit 0\nfi\n\nmkdir -p \"$STATE_DIR/portfolio\"\nif docker inspect polyautomate-executor >/dev/null 2>&1; then\n  docker cp polyautomate-executor:/var/lib/polyautomate/longshot-state.json \"$STATE_DIR/longshot-state.json\" >/dev/null 2>&1 || true\nfi\nPYTHONPATH=\"$REPO_DIR\" python3 -m polyautomate.portfolio   --state \"$STATE_DIR/longshot-state.json\"   --out \"$STATE_DIR/portfolio/index.html\"\naws s3 cp \"$STATE_DIR/portfolio/index.html\" \"s3://$PORTFOLIO_BUCKET/index.html\"   --region \"$REGION\"   --cache-control \"no-store\"   --content-type \"text/html; charset=utf-8\"   --only-show-errors\necho \"portfolio_published bucket=$PORTFOLIO_BUCKET\"\nSCRIPT",
+                    "chmod +x /usr/local/bin/publish-portfolio-dashboard.sh",
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          "cat > /etc/polyautomate-portfolio.env <<'ENV'\nREGION=",
+                          {
+                            "Ref": "AWS::Region"
+                          },
+                          "\nREPO_DIR=/opt/polyautomate-src\nPORTFOLIO_BUCKET=",
+                          {
+                            "Ref": "PortfolioDashboardBucket3C1405C0"
+                          },
+                          "\nPORTFOLIO_DISTRIBUTION_DOMAIN=",
+                          {
+                            "Fn::GetAtt": [
+                              "PortfolioDashboardDistributionF187906F",
+                              "DomainName"
+                            ]
+                          },
+                          "\nENV"
+                        ]
+                      ]
+                    },
+                    "echo '* * * * * root bash -lc \"set -a; source /etc/polyautomate-portfolio.env; set +a; /usr/local/bin/publish-portfolio-dashboard.sh\"' > /etc/cron.d/polyautomate-portfolio",
+                    "chmod 644 /etc/cron.d/polyautomate-portfolio",
+                    "systemctl restart crond",
+                    "bash -lc 'set -a; source /etc/polyautomate-portfolio.env; set +a; /usr/local/bin/publish-portfolio-dashboard.sh'"
+                  ]
+                },
+                "targets": [
+                  {
+                    "key": "InstanceIds",
+                    "values": [
+                      {
+                        "Ref": "ExecutorHostInstanceV37643D472"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_ssm.CfnAssociation",
+              "version": "2.183.0"
             }
           },
           "ResearcherCluster": {
@@ -1336,12 +1685,24 @@
                             }
                           },
                           {
-                            "name": "ENABLE_CLAUDE",
+                            "name": "NOTIFIER_ONLY",
                             "value": "1"
                           },
                           {
+                            "name": "ENABLE_CLAUDE",
+                            "value": "0"
+                          },
+                          {
+                            "name": "ENABLE_BACKTEST",
+                            "value": "0"
+                          },
+                          {
                             "name": "ENABLE_PR_AUTOMATION",
-                            "value": "1"
+                            "value": "0"
+                          },
+                          {
+                            "name": "BACKTEST_CMD",
+                            "value": "true"
                           },
                           {
                             "name": "STATE_BUCKET",
@@ -1355,7 +1716,7 @@
                           },
                           {
                             "name": "GITHUB_REPO",
-                            "value": "giuliovv/polyautomate"
+                            "value": ""
                           },
                           {
                             "name": "GITHUB_BASE_BRANCH",
@@ -2259,6 +2620,22 @@
               "version": "2.183.0"
             }
           },
+          "PortfolioDashboardBucketName": {
+            "id": "PortfolioDashboardBucketName",
+            "path": "PolyautomateStack/PortfolioDashboardBucketName",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnOutput",
+              "version": "2.183.0"
+            }
+          },
+          "PortfolioDashboardUrl": {
+            "id": "PortfolioDashboardUrl",
+            "path": "PolyautomateStack/PortfolioDashboardUrl",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnOutput",
+              "version": "2.183.0"
+            }
+          },
           "ExecutorCredentialsSecretArn": {
             "id": "ExecutorCredentialsSecretArn",
             "path": "PolyautomateStack/ExecutorCredentialsSecretArn",
@@ -2298,7 +2675,7 @@
             },
             "constructInfo": {
               "fqn": "constructs.Construct",
-              "version": "10.4.2"
+              "version": "10.8.1"
             }
           },
           "BootstrapVersion": {
@@ -2328,7 +2705,7 @@
         "path": "Tree",
         "constructInfo": {
           "fqn": "constructs.Construct",
-          "version": "10.4.2"
+          "version": "10.8.1"
         }
       }
     },

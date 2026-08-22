@@ -18,7 +18,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-polyauto1-deploy-role-${AWS::AccountId}-${AWS::Region}",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-polyauto1-cfn-exec-role-${AWS::AccountId}-${AWS::Region}",
-        "stackTemplateAssetObjectUrl": "s3://cdk-polyauto1-assets-${AWS::AccountId}-${AWS::Region}/e8725ae7202907392b34a36bd9c3b5d00ad27f850f86cdcfc6fcd54b721333a4.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-polyauto1-assets-${AWS::AccountId}-${AWS::Region}/48bbf08ac587b9cd5ddb5504932db35bedd977b1fa4192416362b8100036e58b.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/polyauto1/version",
         "additionalDependencies": [
@@ -136,6 +136,30 @@
             "data": "ResearcherStateBucketPolicyFC7CF3F7"
           }
         ],
+        "/PolyautomateStack/PortfolioDashboardBucket/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PortfolioDashboardBucket3C1405C0"
+          }
+        ],
+        "/PolyautomateStack/PortfolioDashboardBucket/Policy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PortfolioDashboardBucketPolicy2E6B7E17"
+          }
+        ],
+        "/PolyautomateStack/PortfolioDashboardDistribution/Origin1/S3OriginAccessControl/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PortfolioDashboardDistributionOrigin1S3OriginAccessControl33792C4F"
+          }
+        ],
+        "/PolyautomateStack/PortfolioDashboardDistribution/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PortfolioDashboardDistributionF187906F"
+          }
+        ],
         "/PolyautomateStack/ExecutorCredentialsSecret/Resource": [
           {
             "type": "aws:cdk:logicalId",
@@ -218,6 +242,12 @@
           {
             "type": "aws:cdk:logicalId",
             "data": "SsmParameterValueawsserviceamiamazonlinuxlatestal2023amikernel61x8664C96584B6F00A464EAD1953AFF4B05118Parameter"
+          }
+        ],
+        "/PolyautomateStack/PortfolioDashboardPublisherAssociation": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PortfolioDashboardPublisherAssociation"
           }
         ],
         "/PolyautomateStack/ResearcherCluster/Resource": [
@@ -362,6 +392,18 @@
           {
             "type": "aws:cdk:logicalId",
             "data": "ResearcherStateBucketName"
+          }
+        ],
+        "/PolyautomateStack/PortfolioDashboardBucketName": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PortfolioDashboardBucketName"
+          }
+        ],
+        "/PolyautomateStack/PortfolioDashboardUrl": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PortfolioDashboardUrl"
           }
         ],
         "/PolyautomateStack/ExecutorCredentialsSecretArn": [

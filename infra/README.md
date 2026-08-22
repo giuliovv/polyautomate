@@ -20,6 +20,7 @@ This CDK app provisions a two-runtime architecture:
 - CloudWatch log groups:
   - `/polyautomate/executor`
   - `/polyautomate/researcher`
+- Private S3 bucket + CloudFront distribution for the read-only portfolio dashboard
 - `t4g.nano` Auto Scaling Group with desired=1 for executor
 - ECS cluster + Fargate task definition for researcher
 - EventBridge daily schedule for researcher
@@ -74,6 +75,23 @@ Researcher container env vars:
 - `BACKTEST_CMD` (default: `python examples/basic_usage.py`)
 - `ENABLE_CLAUDE` (`1` to enable Claude CLI execution)
 - `RESEARCHER_SUMMARY_PATH` (default: `/tmp/research_summary.json`)
+
+## Portfolio dashboard
+
+The executor host publishes a sanitized static report from
+`/var/lib/polyautomate/longshot-state.json` to the dashboard S3 bucket every
+minute. CloudFront serves that `index.html` with caching disabled, so there is no
+public listener on the trading EC2 and no dashboard process with access to
+trading credentials.
+
+Deployment outputs include:
+
+- `PortfolioDashboardBucketName`
+- `PortfolioDashboardUrl`
+
+The executor role only receives read/write access to that dashboard bucket. The
+bucket blocks public access; CloudFront reads it through an origin access
+control.
 
 ## Important next wiring
 
