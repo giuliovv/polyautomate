@@ -168,6 +168,27 @@ class TestFetchUsdcBalance:
     def test_zero_balance(self):
         assert self._fetch({"USDC": "0.00"}) == pytest.approx(0.0)
 
+    def test_refreshes_stale_low_balance(self):
+        responses = [
+            _mock_response({"balance": "2092376"}),
+            _mock_response({}),
+            _mock_response({"balance": "36949124"}),
+        ]
+        with patch.dict(os.environ, _VALID_CREDS, clear=False), \
+             patch(
+                 "polyautomate.runtime.longshot_executor.requests.get",
+                 side_effect=responses,
+             ) as mock_get:
+            result = _fetch_usdc_balance()
+
+        assert result == pytest.approx(36.949124)
+        urls = [call.args[0] for call in mock_get.call_args_list]
+        assert urls == [
+            "https://clob.polymarket.com/balance-allowance",
+            "https://clob.polymarket.com/balance-allowance/update",
+            "https://clob.polymarket.com/balance-allowance",
+        ]
+
     # --- error / unrecognised shapes ---
 
     def test_http_error_returns_none(self):

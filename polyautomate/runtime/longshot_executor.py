@@ -515,66 +515,104 @@ def _fetch_usdc_balance() -> float | None:
         LOGGER.warning("balance_fetch_failed: cannot decode POLYMARKET_SIGNING_KEY")
         return None
 
-    base_url = os.getenv("POLYMARKET_CLOB_URL", "https://clob.polymarket.com")
-    path = "/balance-allowance"
-    method = "GET"
-    timestamp = str(int(time.time()))
-    message = f"{timestamp}{method}{path}".encode("utf-8")
-    sig = base64.urlsafe_b64encode(_hmac.new(secret_bytes, message, hashlib.sha256).digest()).decode("utf-8")
-
-    headers = {
-        "POLY_ADDRESS": address,
-        "POLY_API_KEY": api_key,
-        "POLY_TIMESTAMP": timestamp,
-        "POLY_SIGNATURE": sig,
-        "POLY_PASSPHRASE": passphrase,
-    }
-
-    try:
-        resp = requests.get(
-            f"{base_url}{path}",
-            params={"asset_type": "COLLATERAL", "signature_type": signature_type},
-            headers=headers,
-            timeout=10,
-        )
-        if resp.status_code >= 400:
-            LOGGER.warning("balance_fetch_failed status=%d body=%s", resp.status_code, resp.text[:200])
-            return None
-        payload = resp.json()
-    except Exception:
-        LOGGER.exception("balance_fetch_failed")
-        return None
-
-    if not isinstance(payload, dict):
-        return None
-
     _USDC_DECIMALS = 1_000_000  # USDC uses 6 decimal places on Polygon
 
-    # Flat dict: {"balance": "9483019"} — raw USDC units, divide by 1e6
-    for key in ("USDC", "usdc", "collateral", "free", "available", "balance"):
-        val = payload.get(key)
-        if val is not None:
-            try:
-                raw = float(val)
-                # Values >= 1000 are almost certainly raw on-chain units (micro-USDC);
-                # small values (e.g. from a mock or already-converted response) are used as-is.
-                return raw / _USDC_DECIMALS if raw >= 1000 else raw
-            except (TypeError, ValueError):
-                continue
-    # Nested list: {"balances": [{"asset": "USDC", "balance": "10.5"}]}
-    nested = payload.get("balances") or payload.get("data") or []
-    if isinstance(nested, list):
-        for item in nested:
-            if not isinstance(item, dict):
-                continue
-            asset = str(item.get("asset", item.get("token", ""))).upper()
-            if asset in {"USDC", "COLLATERAL"}:
+    def _signed_get(path: str) -> dict | None:
+        base_url = os.getenv("POLYMARKET_CLOB_URL", "https://clob.polymarket.com")
+        method = "GET"
+        timestamp = str(int(time.time()))
+        message = f"{timestamp}{method}{path}".encode("utf-8")
+        sig = base64.urlsafe_b64encode(
+            _hmac.new(secret_bytes, message, hashlib.sha256).digest()
+        ).decode("utf-8")
+
+        headers = {
+            "POLY_ADDRESS": address,
+            "POLY_API_KEY": api_key,
+            "POLY_TIMESTAMP": timestamp,
+            "POLY_SIGNATURE": sig,
+            "POLY_PASSPHRASE": passphrase,
+        }
+
+        try:
+            resp = requests.get(
+                f"{base_url}{path}",
+                params={"asset_type": "COLLATERAL", "signature_type": signature_type},
+                headers=headers,
+                timeout=10,
+            )
+            if resp.status_code >= 400:
+                LOGGER.warning(
+                    "balance_fetch_failed path=%s status=%d body=%s",
+                    path,
+                    resp.status_code,
+                    resp.text[:200],
+                )
+                return None
+            if not resp.content:
+                return {}
+            payload = resp.json()
+        except Exception:
+            LOGGER.exception("balance_fetch_failed path=%s", path)
+            return None
+        return payload if isinstance(payload, dict) else None
+
+    def _parse_balance(payload: dict) -> float | None:
+        # Flat dict: {"balance": "9483019"} — raw USDC units, divide by 1e6
+        for key in ("USDC", "usdc", "collateral", "free", "available", "balance"):
+            val = payload.get(key)
+            if val is not None:
                 try:
-                    return float(item.get("balance", item.get("amount", 0)))
+                    raw = float(val)
+                    # Values >= 1000 are almost certainly raw on-chain units (micro-USDC);
+                    # small values (e.g. from a mock or already-converted response) are used as-is.
+                    return raw / _USDC_DECIMALS if raw >= 1000 else raw
                 except (TypeError, ValueError):
                     continue
-    LOGGER.warning("balance_response_unparseable payload=%s", payload)
-    return None
+        # Nested list: {"balances": [{"asset": "USDC", "balance": "10.5"}]}
+        nested = payload.get("balances") or payload.get("data") or []
+        if isinstance(nested, list):
+            for item in nested:
+                if not isinstance(item, dict):
+                    continue
+                asset = str(item.get("asset", item.get("token", ""))).upper()
+                if asset in {"USDC", "COLLATERAL"}:
+                    try:
+                        return float(item.get("balance", item.get("amount", 0)))
+                    except (TypeError, ValueError):
+                        continue
+        return None
+
+    payload = _signed_get("/balance-allowance")
+    if payload is None:
+        return None
+
+    balance = _parse_balance(payload)
+    if balance is None:
+        LOGGER.warning("balance_response_unparseable payload=%s", payload)
+        return None
+
+    refresh_threshold = float(os.getenv("POLYMARKET_BALANCE_REFRESH_THRESHOLD_USD", "10"))
+    if 0 <= balance < refresh_threshold:
+        LOGGER.info(
+            "balance_refresh_attempt balance=%.2f threshold=%.2f",
+            balance,
+            refresh_threshold,
+        )
+        _signed_get("/balance-allowance/update")
+        refreshed_payload = _signed_get("/balance-allowance")
+        if refreshed_payload is not None:
+            refreshed_balance = _parse_balance(refreshed_payload)
+            if refreshed_balance is not None:
+                if refreshed_balance != balance:
+                    LOGGER.info(
+                        "balance_refresh_changed before=%.2f after=%.2f",
+                        balance,
+                        refreshed_balance,
+                    )
+                return refreshed_balance
+
+    return balance
 
 
 def _compute_order_size(
