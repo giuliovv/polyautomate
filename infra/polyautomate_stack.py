@@ -209,7 +209,7 @@ class PolyautomateStack(cdk.Stack):
         )
         executor_log_group.grant_write(executor_role)
         executor_credentials_secret.grant_read(executor_role)
-        portfolio_bucket.grant_read_write(executor_role)
+        portfolio_bucket.grant_put(executor_role)
 
         executor_instance = ec2.Instance(
             self,
@@ -428,7 +428,8 @@ SCRIPT""",
                     f"cat > /etc/polyautomate-portfolio.env <<'ENV'\nREGION={cdk.Aws.REGION}\nREPO_DIR=/opt/polyautomate-src\nPORTFOLIO_BUCKET={portfolio_bucket.bucket_name}\nPORTFOLIO_DISTRIBUTION_DOMAIN={portfolio_distribution.distribution_domain_name}\nENV",
                     "echo '* * * * * root bash -lc \"set -a; source /etc/polyautomate-portfolio.env; set +a; /usr/local/bin/publish-portfolio-dashboard.sh\"' > /etc/cron.d/polyautomate-portfolio",
                     "chmod 644 /etc/cron.d/polyautomate-portfolio",
-                    "systemctl restart crond",
+                    "echo portfolio_publisher_version=2",
+                    "systemctl restart crond || true",
                     "bash -lc 'set -a; source /etc/polyautomate-portfolio.env; set +a; /usr/local/bin/publish-portfolio-dashboard.sh'",
                 ]
             },
