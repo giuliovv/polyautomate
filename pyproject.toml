@@ -10,6 +10,9 @@ dependencies = [
     "polymarket-client>=0.1.0b7",
 ]
 
+[project.scripts]
+polyautomate-portfolio = "polyautomate.portfolio:main"
+
 [project.optional-dependencies]
 backtest = [
     "numpy>=1.24",

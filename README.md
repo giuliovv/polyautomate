@@ -22,6 +22,33 @@ pip install -e .
 
 Requires Python 3.10+.
 
+## Portfolio dashboard
+
+The live longshot executor stores read-only portfolio state at
+`/var/lib/polyautomate/longshot-state.json`. You can inspect it without touching
+trading credentials or order execution:
+
+```
+python3 -m polyautomate.portfolio --state /var/lib/polyautomate/longshot-state.json --serve --host 0.0.0.0 --port 8765
+```
+
+Or generate a static HTML report:
+
+```
+python3 -m polyautomate.portfolio --state /var/lib/polyautomate/longshot-state.json --out portfolio.html
+```
+
+If the package is installed with `pip install -e .`, the same command is
+available as:
+
+```
+polyautomate-portfolio --state /var/lib/polyautomate/longshot-state.json --serve
+```
+
+The dashboard shows realized P&L, win rate, open entry exposure, an equity curve,
+open positions, and recent closed positions. It deliberately reads only the local
+state file; it does not fetch secrets, submit orders, or mutate executor state.
+
 ## Quick start — backtesting
 
 ```python
