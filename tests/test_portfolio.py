@@ -5,7 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from polyautomate.portfolio import equity_curve, load_state, render_html, summarize, write_report
+from polyautomate.portfolio import (
+    equity_curve,
+    load_state,
+    render_data_api_html,
+    render_html,
+    summarize,
+    write_report,
+)
 
 
 def sample_state():
@@ -104,3 +111,35 @@ def test_render_escapes_market_text():
 
     assert "<script>alert(1)</script>" not in html
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+
+
+def test_render_data_api_html_shows_live_position_metrics():
+    payload = {
+        "user": "0xae5abda8ceea453dd43adaa3458a1fff4cdce2b0",
+        "fetched_at": "2026-08-22T14:00:00+00:00",
+        "value": [{"user": "0xae5abda8ceea453dd43adaa3458a1fff4cdce2b0", "value": 66.03}],
+        "positions": [
+            {
+                "title": "Will Trump acquire Greenland before 2027?",
+                "slug": "will-trump-acquire-greenland-before-2027",
+                "outcome": "No",
+                "size": 22.3,
+                "avgPrice": 0.9244,
+                "curPrice": 0.9655,
+                "currentValue": 21.5306,
+                "cashPnl": 0.9148,
+                "percentPnl": 4.4373,
+                "initialValue": 20.6157,
+                "realizedPnl": 0,
+            }
+        ],
+        "activity": [{"type": "DEPOSIT", "timestamp": 1787403750, "usdcSize": 30}],
+    }
+
+    html = render_data_api_html(payload, spendable_usdc=2.09)
+
+    assert "Portfolio value" in html
+    assert "$66.03" in html
+    assert "$2.09" in html
+    assert "Will Trump acquire Greenland before 2027?" in html
+    assert "Below typical 5-share minimum" in html

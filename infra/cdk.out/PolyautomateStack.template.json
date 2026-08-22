@@ -896,7 +896,7 @@
     "Name": "AWS-RunShellScript",
     "Parameters": {
      "commands": [
-      "cat > /usr/local/bin/publish-portfolio-dashboard.sh <<'SCRIPT'\n#!/usr/bin/env bash\nset -euo pipefail\nREGION=\"${REGION:-eu-west-1}\"\nREPO_DIR=\"${REPO_DIR:-/opt/polyautomate-src}\"\nSTATE_DIR=\"/var/lib/polyautomate\"\nPORTFOLIO_BUCKET=\"${PORTFOLIO_BUCKET:-}\"\n\nif [[ -z \"$PORTFOLIO_BUCKET\" ]]; then\n  echo \"portfolio_publish_skipped reason=missing_bucket\"\n  exit 0\nfi\nif [[ ! -d \"$REPO_DIR\" ]]; then\n  echo \"portfolio_publish_skipped reason=missing_repo repo_dir=$REPO_DIR\"\n  exit 0\nfi\nif ! PYTHONPATH=\"$REPO_DIR\" python3 -c 'import polyautomate.portfolio' >/dev/null 2>&1; then\n  echo \"portfolio_publish_skipped reason=portfolio_module_unavailable repo_dir=$REPO_DIR\"\n  exit 0\nfi\n\nmkdir -p \"$STATE_DIR/portfolio\"\nif docker inspect polyautomate-executor >/dev/null 2>&1; then\n  docker cp polyautomate-executor:/var/lib/polyautomate/longshot-state.json \"$STATE_DIR/longshot-state.json\" >/dev/null 2>&1 || true\nfi\nPYTHONPATH=\"$REPO_DIR\" python3 -m polyautomate.portfolio   --state \"$STATE_DIR/longshot-state.json\"   --out \"$STATE_DIR/portfolio/index.html\"\naws s3 cp \"$STATE_DIR/portfolio/index.html\" \"s3://$PORTFOLIO_BUCKET/index.html\"   --region \"$REGION\"   --cache-control \"no-store\"   --content-type \"text/html; charset=utf-8\"   --only-show-errors\necho \"portfolio_published bucket=$PORTFOLIO_BUCKET\"\nSCRIPT",
+      "cat > /usr/local/bin/publish-portfolio-dashboard.sh <<'SCRIPT'\n#!/usr/bin/env bash\nset -euo pipefail\nREGION=\"${REGION:-eu-west-1}\"\nREPO_DIR=\"${REPO_DIR:-/opt/polyautomate-src}\"\nSTATE_DIR=\"/var/lib/polyautomate\"\nPORTFOLIO_BUCKET=\"${PORTFOLIO_BUCKET:-}\"\nSECRET_ARN=\"${SECRET_ARN:-}\"\n\nif [[ -z \"$PORTFOLIO_BUCKET\" ]]; then\n  echo \"portfolio_publish_skipped reason=missing_bucket\"\n  exit 0\nfi\nif [[ -z \"$SECRET_ARN\" ]]; then\n  echo \"portfolio_publish_skipped reason=missing_secret_arn\"\n  exit 0\nfi\nif [[ ! -d \"$REPO_DIR\" ]]; then\n  echo \"portfolio_publish_skipped reason=missing_repo repo_dir=$REPO_DIR\"\n  exit 0\nfi\nif ! PYTHONPATH=\"$REPO_DIR\" python3 -c 'import polyautomate.portfolio' >/dev/null 2>&1; then\n  echo \"portfolio_publish_skipped reason=portfolio_module_unavailable repo_dir=$REPO_DIR\"\n  exit 0\nfi\n\nSECRET_JSON=\"$(aws secretsmanager get-secret-value --region \"$REGION\" --secret-id \"$SECRET_ARN\" --query SecretString --output text)\"\nexport POLYMARKET_API_KEY=\"$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_API_KEY\", \"\"))')\"\nexport POLYMARKET_PASSPHRASE=\"$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_PASSPHRASE\", \"\"))')\"\nexport POLYMARKET_SIGNING_KEY=\"$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_SIGNING_KEY\", \"\"))')\"\nexport POLYMARKET_ADDRESS=\"$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_ADDRESS\", \"\"))')\"\nexport POLYMARKET_SIGNER_ADDRESS=\"$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_SIGNER_ADDRESS\", \"\"))')\"\nexport POLYMARKET_SIGNATURE_TYPE=\"$(printf '%s' \"$SECRET_JSON\" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"POLYMARKET_SIGNATURE_TYPE\", \"1\") or \"1\")')\"\n\nmkdir -p \"$STATE_DIR/portfolio\"\nif docker inspect polyautomate-executor >/dev/null 2>&1; then\n  docker cp polyautomate-executor:/var/lib/polyautomate/longshot-state.json \"$STATE_DIR/longshot-state.json\" >/dev/null 2>&1 || true\nfi\nPYTHONPATH=\"$REPO_DIR\" python3 -m polyautomate.portfolio   --user \"$POLYMARKET_ADDRESS\"   --include-clob-balance   --out \"$STATE_DIR/portfolio/index.html\"\naws s3 cp \"$STATE_DIR/portfolio/index.html\" \"s3://$PORTFOLIO_BUCKET/index.html\"   --region \"$REGION\"   --cache-control \"no-store\"   --content-type \"text/html; charset=utf-8\"   --only-show-errors\necho \"portfolio_published bucket=$PORTFOLIO_BUCKET\"\nSCRIPT",
       "chmod +x /usr/local/bin/publish-portfolio-dashboard.sh",
       {
        "Fn::Join": [
@@ -906,7 +906,11 @@
          {
           "Ref": "AWS::Region"
          },
-         "\nREPO_DIR=/opt/polyautomate-src\nPORTFOLIO_BUCKET=",
+         "\nREPO_DIR=/opt/polyautomate-src\nSECRET_ARN=",
+         {
+          "Ref": "ExecutorCredentialsSecretE3494440"
+         },
+         "\nPORTFOLIO_BUCKET=",
          {
           "Ref": "PortfolioDashboardBucket3C1405C0"
          },
@@ -923,7 +927,7 @@
       },
       "echo '* * * * * root bash -lc \"set -a; source /etc/polyautomate-portfolio.env; set +a; /usr/local/bin/publish-portfolio-dashboard.sh\"' > /etc/cron.d/polyautomate-portfolio",
       "chmod 644 /etc/cron.d/polyautomate-portfolio",
-      "echo portfolio_publisher_version=2",
+      "echo portfolio_publisher_version=3",
       "systemctl restart crond || true",
       "bash -lc 'set -a; source /etc/polyautomate-portfolio.env; set +a; /usr/local/bin/publish-portfolio-dashboard.sh'"
      ]

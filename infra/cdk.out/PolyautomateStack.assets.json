@@ -1,7 +1,7 @@
 {
   "version": "40.0.0",
   "files": {
-    "a4a4d86621a5d8f588fc297fa16a467523e1bf051c1a08ab51427621444f170a": {
+    "be8b7224f6f5694133800169add2a5a04fe5125d62ce02114b608090a6477171": {
       "source": {
         "path": "PolyautomateStack.template.json",
         "packaging": "file"
@@ -9,7 +9,7 @@
       "destinations": {
         "current_account-current_region": {
           "bucketName": "cdk-polyauto1-assets-${AWS::AccountId}-${AWS::Region}",
-          "objectKey": "a4a4d86621a5d8f588fc297fa16a467523e1bf051c1a08ab51427621444f170a.json",
+          "objectKey": "be8b7224f6f5694133800169add2a5a04fe5125d62ce02114b608090a6477171.json",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-polyauto1-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
         }
       }

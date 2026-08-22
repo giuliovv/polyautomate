@@ -18,7 +18,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-polyauto1-deploy-role-${AWS::AccountId}-${AWS::Region}",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-polyauto1-cfn-exec-role-${AWS::AccountId}-${AWS::Region}",
-        "stackTemplateAssetObjectUrl": "s3://cdk-polyauto1-assets-${AWS::AccountId}-${AWS::Region}/a4a4d86621a5d8f588fc297fa16a467523e1bf051c1a08ab51427621444f170a.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-polyauto1-assets-${AWS::AccountId}-${AWS::Region}/be8b7224f6f5694133800169add2a5a04fe5125d62ce02114b608090a6477171.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/polyauto1/version",
         "additionalDependencies": [

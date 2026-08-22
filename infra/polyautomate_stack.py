@@ -396,9 +396,14 @@ REGION="${REGION:-eu-west-1}"
 REPO_DIR="${REPO_DIR:-/opt/polyautomate-src}"
 STATE_DIR="/var/lib/polyautomate"
 PORTFOLIO_BUCKET="${PORTFOLIO_BUCKET:-}"
+SECRET_ARN="${SECRET_ARN:-}"
 
 if [[ -z "$PORTFOLIO_BUCKET" ]]; then
   echo "portfolio_publish_skipped reason=missing_bucket"
+  exit 0
+fi
+if [[ -z "$SECRET_ARN" ]]; then
+  echo "portfolio_publish_skipped reason=missing_secret_arn"
   exit 0
 fi
 if [[ ! -d "$REPO_DIR" ]]; then
@@ -410,12 +415,21 @@ if ! PYTHONPATH="$REPO_DIR" python3 -c 'import polyautomate.portfolio' >/dev/nul
   exit 0
 fi
 
+SECRET_JSON="$(aws secretsmanager get-secret-value --region "$REGION" --secret-id "$SECRET_ARN" --query SecretString --output text)"
+export POLYMARKET_API_KEY="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_API_KEY", ""))')"
+export POLYMARKET_PASSPHRASE="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_PASSPHRASE", ""))')"
+export POLYMARKET_SIGNING_KEY="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_SIGNING_KEY", ""))')"
+export POLYMARKET_ADDRESS="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_ADDRESS", ""))')"
+export POLYMARKET_SIGNER_ADDRESS="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_SIGNER_ADDRESS", ""))')"
+export POLYMARKET_SIGNATURE_TYPE="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_SIGNATURE_TYPE", "1") or "1")')"
+
 mkdir -p "$STATE_DIR/portfolio"
 if docker inspect polyautomate-executor >/dev/null 2>&1; then
   docker cp polyautomate-executor:/var/lib/polyautomate/longshot-state.json "$STATE_DIR/longshot-state.json" >/dev/null 2>&1 || true
 fi
 PYTHONPATH="$REPO_DIR" python3 -m polyautomate.portfolio \
-  --state "$STATE_DIR/longshot-state.json" \
+  --user "$POLYMARKET_ADDRESS" \
+  --include-clob-balance \
   --out "$STATE_DIR/portfolio/index.html"
 aws s3 cp "$STATE_DIR/portfolio/index.html" "s3://$PORTFOLIO_BUCKET/index.html" \
   --region "$REGION" \
@@ -425,10 +439,10 @@ aws s3 cp "$STATE_DIR/portfolio/index.html" "s3://$PORTFOLIO_BUCKET/index.html" 
 echo "portfolio_published bucket=$PORTFOLIO_BUCKET"
 SCRIPT""",
                     "chmod +x /usr/local/bin/publish-portfolio-dashboard.sh",
-                    f"cat > /etc/polyautomate-portfolio.env <<'ENV'\nREGION={cdk.Aws.REGION}\nREPO_DIR=/opt/polyautomate-src\nPORTFOLIO_BUCKET={portfolio_bucket.bucket_name}\nPORTFOLIO_DISTRIBUTION_DOMAIN={portfolio_distribution.distribution_domain_name}\nENV",
+                    f"cat > /etc/polyautomate-portfolio.env <<'ENV'\nREGION={cdk.Aws.REGION}\nREPO_DIR=/opt/polyautomate-src\nSECRET_ARN={executor_credentials_secret.secret_arn}\nPORTFOLIO_BUCKET={portfolio_bucket.bucket_name}\nPORTFOLIO_DISTRIBUTION_DOMAIN={portfolio_distribution.distribution_domain_name}\nENV",
                     "echo '* * * * * root bash -lc \"set -a; source /etc/polyautomate-portfolio.env; set +a; /usr/local/bin/publish-portfolio-dashboard.sh\"' > /etc/cron.d/polyautomate-portfolio",
                     "chmod 644 /etc/cron.d/polyautomate-portfolio",
-                    "echo portfolio_publisher_version=2",
+                    "echo portfolio_publisher_version=3",
                     "systemctl restart crond || true",
                     "bash -lc 'set -a; source /etc/polyautomate-portfolio.env; set +a; /usr/local/bin/publish-portfolio-dashboard.sh'",
                 ]
