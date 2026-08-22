@@ -16,6 +16,8 @@ from aws_cdk import (
     aws_iam as iam,
     aws_lambda as _lambda,
     aws_logs as logs,
+    aws_route53 as route53,
+    aws_route53_targets as route53_targets,
     aws_s3 as s3,
     aws_secretsmanager as secretsmanager,
     aws_sns as sns,
@@ -40,11 +42,14 @@ class PolyautomateStack(cdk.Stack):
         )
         portfolio_domain_name = self.node.try_get_context("portfolioDomainName")
         portfolio_certificate_arn = self.node.try_get_context("portfolioCertificateArn")
+        portfolio_hosted_zone_name = self.node.try_get_context("portfolioHostedZoneName")
         if portfolio_domain_name and not portfolio_certificate_arn:
             raise ValueError(
                 "portfolioCertificateArn is required when portfolioDomainName is set. "
                 "For CloudFront, request/import this ACM certificate in us-east-1."
             )
+        if portfolio_hosted_zone_name and not portfolio_domain_name:
+            raise ValueError("portfolioDomainName is required when portfolioHostedZoneName is set.")
         portfolio_certificate = (
             acm.Certificate.from_certificate_arn(
                 self,
@@ -135,6 +140,27 @@ class PolyautomateStack(cdk.Stack):
             ),
             comment="Read-only Polyautomate portfolio dashboard",
         )
+        if portfolio_domain_name and portfolio_hosted_zone_name:
+            portfolio_hosted_zone = route53.HostedZone.from_lookup(
+                self,
+                "PortfolioDashboardHostedZone",
+                domain_name=portfolio_hosted_zone_name,
+            )
+            record_name = portfolio_domain_name
+            suffix = f".{portfolio_hosted_zone_name}"
+            if portfolio_domain_name == portfolio_hosted_zone_name:
+                record_name = None
+            elif portfolio_domain_name.endswith(suffix):
+                record_name = portfolio_domain_name[: -len(suffix)]
+            route53.ARecord(
+                self,
+                "PortfolioDashboardAliasRecord",
+                zone=portfolio_hosted_zone,
+                record_name=record_name,
+                target=route53.RecordTarget.from_alias(
+                    route53_targets.CloudFrontTarget(portfolio_distribution)
+                ),
+            )
 
         executor_credentials_secret = secretsmanager.Secret(
             self,

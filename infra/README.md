@@ -105,6 +105,16 @@ cdk deploy \
   -c portfolioCertificateArn=arn:aws:acm:us-east-1:123456789012:certificate/...
 ```
 
+If the domain is inside a Route 53 hosted zone controlled by this AWS account,
+also pass `portfolioHostedZoneName` and CDK will create the DNS alias record:
+
+```bash
+cdk deploy \
+  -c portfolioDomainName=polybot.aws.giuliovaccari.it \
+  -c portfolioHostedZoneName=aws.giuliovaccari.it \
+  -c portfolioCertificateArn=arn:aws:acm:us-east-1:854656252703:certificate/...
+```
+
 Important details:
 
 - CloudFront requires the ACM certificate to be in `us-east-1`, even though this
@@ -117,6 +127,10 @@ Important details:
 - CDK can automate DNS records only if the hosted zone is in Route 53. With
   Squarespace DNS, the Squarespace DNS records remain a manual step unless we
   later delegate a subdomain to Route 53.
+- The shared delegated experiment zone is `aws.giuliovaccari.it`. Once
+  Squarespace delegates that subdomain to Route 53, future experiment domains
+  should use names like `polybot.aws.giuliovaccari.it` and pass
+  `portfolioHostedZoneName=aws.giuliovaccari.it`.
 
 ## Important next wiring
 
