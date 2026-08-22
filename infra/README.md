@@ -93,6 +93,31 @@ The executor role only receives read/write access to that dashboard bucket. The
 bucket blocks public access; CloudFront reads it through an origin access
 control.
 
+### Custom dashboard domain
+
+The dashboard CloudFront distribution can be attached to a custom subdomain,
+for example `poly.mydomain.it`, with CDK context:
+
+```bash
+cd infra
+cdk deploy \
+  -c portfolioDomainName=poly.mydomain.it \
+  -c portfolioCertificateArn=arn:aws:acm:us-east-1:123456789012:certificate/...
+```
+
+Important details:
+
+- CloudFront requires the ACM certificate to be in `us-east-1`, even though this
+  stack is deployed in `eu-west-1`.
+- If DNS stays in Squarespace, request the ACM certificate with DNS validation,
+  add the validation CNAME in Squarespace, wait for issuance, then deploy CDK
+  with the certificate ARN.
+- After CDK deploys the alias, add a Squarespace DNS CNAME:
+  `poly` -> the `PortfolioDashboardUrl` CloudFront hostname.
+- CDK can automate DNS records only if the hosted zone is in Route 53. With
+  Squarespace DNS, the Squarespace DNS records remain a manual step unless we
+  later delegate a subdomain to Route 53.
+
 ## Important next wiring
 
 - Implement your strategy function at the `STRATEGY_RUNNER` import path.

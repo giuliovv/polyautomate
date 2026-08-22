@@ -5,6 +5,7 @@ from aws_cdk import (
     Duration,
     aws_cloudwatch as cloudwatch,
     aws_cloudwatch_actions as cloudwatch_actions,
+    aws_certificatemanager as acm,
     aws_cloudfront as cloudfront,
     aws_cloudfront_origins as origins,
     aws_ec2 as ec2,
@@ -36,6 +37,22 @@ class PolyautomateStack(cdk.Stack):
         executor_repo_branch = self.node.try_get_context("executorRepoBranch") or "main"
         executor_instance_type = (
             self.node.try_get_context("executorInstanceType") or "t3.micro"
+        )
+        portfolio_domain_name = self.node.try_get_context("portfolioDomainName")
+        portfolio_certificate_arn = self.node.try_get_context("portfolioCertificateArn")
+        if portfolio_domain_name and not portfolio_certificate_arn:
+            raise ValueError(
+                "portfolioCertificateArn is required when portfolioDomainName is set. "
+                "For CloudFront, request/import this ACM certificate in us-east-1."
+            )
+        portfolio_certificate = (
+            acm.Certificate.from_certificate_arn(
+                self,
+                "PortfolioDashboardCertificate",
+                portfolio_certificate_arn,
+            )
+            if portfolio_certificate_arn
+            else None
         )
 
         vpc = ec2.Vpc(
@@ -104,6 +121,8 @@ class PolyautomateStack(cdk.Stack):
             self,
             "PortfolioDashboardDistribution",
             default_root_object="index.html",
+            domain_names=[portfolio_domain_name] if portfolio_domain_name else None,
+            certificate=portfolio_certificate,
             default_behavior=cloudfront.BehaviorOptions(
                 origin=origins.S3BucketOrigin.with_origin_access_control(
                     portfolio_bucket,
@@ -615,5 +634,11 @@ SCRIPT""",
             "PortfolioDashboardUrl",
             value=f"https://{portfolio_distribution.distribution_domain_name}",
         )
+        if portfolio_domain_name:
+            CfnOutput(
+                self,
+                "PortfolioDashboardCustomUrl",
+                value=f"https://{portfolio_domain_name}",
+            )
         CfnOutput(self, "ExecutorCredentialsSecretArn", value=executor_credentials_secret.secret_arn)
         CfnOutput(self, "ResearcherCredentialsSecretArn", value=researcher_credentials_secret.secret_arn)
