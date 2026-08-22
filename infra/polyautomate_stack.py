@@ -43,6 +43,7 @@ class PolyautomateStack(cdk.Stack):
         portfolio_domain_name = self.node.try_get_context("portfolioDomainName")
         portfolio_certificate_arn = self.node.try_get_context("portfolioCertificateArn")
         portfolio_hosted_zone_name = self.node.try_get_context("portfolioHostedZoneName")
+        portfolio_hosted_zone_id = self.node.try_get_context("portfolioHostedZoneId")
         if portfolio_domain_name and not portfolio_certificate_arn:
             raise ValueError(
                 "portfolioCertificateArn is required when portfolioDomainName is set. "
@@ -50,6 +51,8 @@ class PolyautomateStack(cdk.Stack):
             )
         if portfolio_hosted_zone_name and not portfolio_domain_name:
             raise ValueError("portfolioDomainName is required when portfolioHostedZoneName is set.")
+        if portfolio_hosted_zone_name and not portfolio_hosted_zone_id:
+            raise ValueError("portfolioHostedZoneId is required when portfolioHostedZoneName is set.")
         portfolio_certificate = (
             acm.Certificate.from_certificate_arn(
                 self,
@@ -141,10 +144,11 @@ class PolyautomateStack(cdk.Stack):
             comment="Read-only Polyautomate portfolio dashboard",
         )
         if portfolio_domain_name and portfolio_hosted_zone_name:
-            portfolio_hosted_zone = route53.HostedZone.from_lookup(
+            portfolio_hosted_zone = route53.HostedZone.from_hosted_zone_attributes(
                 self,
                 "PortfolioDashboardHostedZone",
-                domain_name=portfolio_hosted_zone_name,
+                hosted_zone_id=portfolio_hosted_zone_id,
+                zone_name=portfolio_hosted_zone_name,
             )
             record_name = portfolio_domain_name
             suffix = f".{portfolio_hosted_zone_name}"

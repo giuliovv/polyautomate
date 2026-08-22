@@ -112,6 +112,7 @@ also pass `portfolioHostedZoneName` and CDK will create the DNS alias record:
 cdk deploy \
   -c portfolioDomainName=polybot.aws.giuliovaccari.it \
   -c portfolioHostedZoneName=aws.giuliovaccari.it \
+  -c portfolioHostedZoneId=Z08788173CZC2PM1CQDUQ \
   -c portfolioCertificateArn=arn:aws:acm:us-east-1:854656252703:certificate/...
 ```
 
