@@ -325,6 +325,7 @@ def render_data_api_html(
     .stack {{ display:grid; grid-template-columns: 1fr; gap:18px; }}
     .empty {{ color:var(--muted); padding:20px; text-align:center; }}
     .pill {{ border:1px solid var(--line); border-radius:999px; padding:7px 10px; color:var(--muted); font-size:13px; }}
+    .note {{ color:var(--muted); margin:-6px 0 12px; font-size:13px; line-height:1.45; }}
     @media (max-width: 800px) {{ header {{ display:block; }} .grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} .value {{ font-size:24px; }} main {{ padding:22px 12px 36px; }} table {{ font-size:12px; }} }}
   </style>
 </head>
@@ -356,8 +357,9 @@ def render_data_api_html(
       <table><thead><tr><th>Market</th><th>Side</th><th>Size</th><th>Avg</th><th>Now</th><th>Value</th><th>P&L</th><th>%</th></tr></thead><tbody>{rows}</tbody></table>
     </section>
     <section class="card">
-      <h2>Recent Activity</h2>
-      <table><thead><tr><th>Type</th><th>Time</th><th>USDC</th><th>Outcome</th><th>Market</th></tr></thead><tbody>{activity_rows}</tbody></table>
+      <h2>Historical Activity</h2>
+      <div class="note">Deposits and trades below are past account events from Polymarket. They are not unallocated cash; use the Spendable CLOB cash card above for current capital available to the bot.</div>
+      <table><thead><tr><th>Type</th><th>Time</th><th>Event amount</th><th>Outcome</th><th>Market</th></tr></thead><tbody>{activity_rows}</tbody></table>
     </section>
   </div>
 </main>
