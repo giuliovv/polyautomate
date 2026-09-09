@@ -40,7 +40,7 @@ class PolyautomateStack(cdk.Stack):
         executor_instance_type = (
             self.node.try_get_context("executorInstanceType") or "t3.micro"
         )
-        longshot_data_provider = self.node.try_get_context("longshotDataProvider") or "polymarketdata"
+        longshot_data_provider = self.node.try_get_context("longshotDataProvider") or "gamma_clob"
         longshot_data_timeout = self.node.try_get_context("longshotDataTimeout") or "10"
         portfolio_domain_name = self.node.try_get_context("portfolioDomainName")
         portfolio_certificate_arn = self.node.try_get_context("portfolioCertificateArn")

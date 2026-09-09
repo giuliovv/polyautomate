@@ -782,7 +782,7 @@ def _place_order_signed(
 
 
 def run_once() -> int:
-    data_provider = os.getenv("LONGSHOT_DATA_PROVIDER", "polymarketdata").strip().lower()
+    data_provider = os.getenv("LONGSHOT_DATA_PROVIDER", "gamma_clob").strip().lower()
     pmd_api_key = os.getenv("POLYMARKETDATA_API_KEY", "")
     pm_api_key = os.getenv("POLYMARKET_API_KEY", "")
     pm_signing_key = os.getenv("POLYMARKET_SIGNING_KEY", "")
