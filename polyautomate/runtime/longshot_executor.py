@@ -15,6 +15,7 @@ from pathlib import Path
 import requests
 
 from polyautomate.clients.polymarketdata import PMDClient, PMDError
+from polyautomate.clients.live_data import GammaLiveDataAdapter
 
 
 LOGGER = logging.getLogger("longshot_executor")
@@ -270,7 +271,7 @@ def _extract_token_price(market: dict, outcome: str) -> float | None:
     return None
 
 
-def _fetch_latest_no_price(client: PMDClient, slug: str, now: datetime) -> float | None:
+def _fetch_latest_no_price(client, slug: str, now: datetime) -> float | None:
     start = now - timedelta(days=7)
     try:
         prices = client.get_prices(slug, start.isoformat(), now.isoformat(), resolution="1h")
@@ -351,7 +352,7 @@ def _latest_price(points: list[dict]) -> float | None:
 
 
 def _scan_candidates(
-    client: PMDClient,
+    client,
     *,
     now: datetime,
     lookback_minutes: int,
@@ -781,6 +782,7 @@ def _place_order_signed(
 
 
 def run_once() -> int:
+    data_provider = os.getenv("LONGSHOT_DATA_PROVIDER", "polymarketdata").strip().lower()
     pmd_api_key = os.getenv("POLYMARKETDATA_API_KEY", "")
     pm_api_key = os.getenv("POLYMARKET_API_KEY", "")
     pm_signing_key = os.getenv("POLYMARKET_SIGNING_KEY", "")
@@ -792,7 +794,11 @@ def run_once() -> int:
     pm_signature_type = int(os.getenv("POLYMARKET_SIGNATURE_TYPE", "1"))
     dry_run = os.getenv("DRY_RUN", "1") == "1"
 
-    if not pmd_api_key:
+    if data_provider not in {"polymarketdata", "pmd", "gamma_clob", "gamma"}:
+        LOGGER.warning("unknown_longshot_data_provider provider=%s", data_provider)
+        return 0
+
+    if data_provider in {"polymarketdata", "pmd"} and not pmd_api_key:
         LOGGER.warning("missing_polymarketdata_api_key")
         return 0
 
@@ -814,7 +820,12 @@ def run_once() -> int:
     fallback_order_size = float(os.getenv("LONGSHOT_ORDER_SIZE", "5"))
     max_actions = int(os.getenv("LONGSHOT_MAX_ACTIONS_PER_CYCLE", "1"))
 
-    pmd = PMDClient(api_key=pmd_api_key)
+    if data_provider in {"gamma_clob", "gamma"}:
+        pmd = GammaLiveDataAdapter(timeout=float(os.getenv("LONGSHOT_DATA_TIMEOUT", "10")))
+        LOGGER.info("longshot_data_provider=gamma_clob")
+    else:
+        pmd = PMDClient(api_key=pmd_api_key, timeout=float(os.getenv("LONGSHOT_DATA_TIMEOUT", "30")))
+        LOGGER.info("longshot_data_provider=polymarketdata")
 
     # --- Live balance fetch (self-correcting bankroll) ---
     # In live mode, read the actual USDC balance from Polymarket and use it

@@ -14,12 +14,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from polyautomate.runtime.longshot_executor import (
+    _scan_candidates,
     InsufficientBalanceError,
     _compute_order_size,
     _fetch_usdc_balance,
     _maybe_send_insufficient_balance_notice,
     _place_order_signed,
 )
+from polyautomate.clients.live_data import GammaLiveDataAdapter
 
 
 # ---------------------------------------------------------------------------
@@ -41,6 +43,17 @@ def _mock_response(json_body, status_code=200):
     resp.text = str(json_body)
     resp.json.return_value = json_body
     return resp
+
+
+class _FakeHttpSession:
+    def __init__(self, payloads):
+        self.payloads = list(payloads)
+        self.headers = {}
+        self.calls = []
+
+    def get(self, url, **kwargs):
+        self.calls.append((url, kwargs))
+        return _mock_response(self.payloads.pop(0))
 
 
 class _FakeAcceptedOrder:
@@ -563,3 +576,71 @@ class TestRunOnceBalanceGuard:
             mod.run_once()
 
         mock_fetch.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# GammaLiveDataAdapter / feature-flagged live data provider
+# ---------------------------------------------------------------------------
+
+class TestGammaLiveDataProvider:
+    MARKET = {
+        "id": "m1",
+        "slug": "sample-longshot-market",
+        "question": "Will sample happen?",
+        "active": True,
+        "closed": False,
+        "endDate": "2026-12-31T00:00:00Z",
+        "outcomes": '["Yes", "No"]',
+        "outcomePrices": '["0.20", "0.80"]',
+        "clobTokenIds": '["yes-token", "no-token"]',
+        "spread": "0.02",
+    }
+
+    def test_adapter_normalizes_gamma_market_for_candidate_scan(self):
+        session = _FakeHttpSession([[self.MARKET], self.MARKET, self.MARKET])
+        adapter = GammaLiveDataAdapter(session=session)
+
+        candidates = _scan_candidates(
+            adapter,
+            now=__import__("datetime").datetime(2026, 9, 9, tzinfo=__import__("datetime").timezone.utc),
+            lookback_minutes=240,
+            market_limit=10,
+            min_days_left=2,
+            longshot_threshold=0.40,
+            min_price=0.02,
+            max_price=0.96,
+            max_spread=0.03,
+            max_rel_spread=0.15,
+            open_positions={},
+        )
+
+        assert len(candidates) == 1
+        candidate = candidates[0]
+        assert candidate.slug == "sample-longshot-market"
+        assert candidate.yes_token_id == "yes-token"
+        assert candidate.no_token_id == "no-token"
+        assert candidate.yes_price == pytest.approx(0.20)
+        assert candidate.no_price == pytest.approx(0.80)
+        assert candidate.avg_spread == pytest.approx(0.02)
+
+    def test_gamma_provider_does_not_require_polymarketdata_key(self):
+        from polyautomate.runtime import longshot_executor as mod
+
+        env = {
+            "LONGSHOT_DATA_PROVIDER": "gamma_clob",
+            "POLYMARKETDATA_API_KEY": "",
+            "DRY_RUN": "1",
+            "LONGSHOT_STATE_PATH": "/tmp/test-longshot-state.json",
+        }
+
+        with patch.dict(os.environ, env, clear=False), \
+             patch.object(mod, "GammaLiveDataAdapter") as mock_gamma_cls, \
+             patch.object(mod, "PMDClient") as mock_pmd_cls, \
+             patch.object(mod, "_load_state", return_value={}), \
+             patch.object(mod, "_save_state"):
+            mock_gamma_cls.return_value.list_markets.return_value = iter([])
+
+            assert mod.run_once() == 0
+
+        mock_gamma_cls.assert_called_once()
+        mock_pmd_cls.assert_not_called()

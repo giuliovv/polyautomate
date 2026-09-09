@@ -40,6 +40,8 @@ class PolyautomateStack(cdk.Stack):
         executor_instance_type = (
             self.node.try_get_context("executorInstanceType") or "t3.micro"
         )
+        longshot_data_provider = self.node.try_get_context("longshotDataProvider") or "polymarketdata"
+        longshot_data_timeout = self.node.try_get_context("longshotDataTimeout") or "10"
         portfolio_domain_name = self.node.try_get_context("portfolioDomainName")
         portfolio_certificate_arn = self.node.try_get_context("portfolioCertificateArn")
         portfolio_hosted_zone_name = self.node.try_get_context("portfolioHostedZoneName")
@@ -337,7 +339,7 @@ else
 fi
 
 NEW_SHA="$(git -C "$REPO_DIR" rev-parse HEAD)"
-SECRET_SIG="$(printf '%s' "$POLYMARKET_API_KEY:$POLYMARKET_PASSPHRASE:$POLYMARKET_SIGNING_KEY:$POLYMARKET_PRIVATE_KEY:$POLYMARKET_ADDRESS:$POLYMARKET_SIGNER_ADDRESS:$POLL_SECONDS:$STRATEGY_RUNNER" | sha256sum | awk '{print $1}')"
+SECRET_SIG="$(printf '%s' "$POLYMARKET_API_KEY:$POLYMARKET_PASSPHRASE:$POLYMARKET_SIGNING_KEY:$POLYMARKET_PRIVATE_KEY:$POLYMARKET_ADDRESS:$POLYMARKET_SIGNER_ADDRESS:$POLL_SECONDS:$STRATEGY_RUNNER:$LONGSHOT_DATA_PROVIDER:$LONGSHOT_DATA_TIMEOUT" | sha256sum | awk '{print $1}')"
 DESIRED_SIG="$NEW_SHA:$SECRET_SIG"
 CURRENT_SIG="$(cat "$STATE_DIR/deploy.sig" 2>/dev/null || true)"
 
@@ -357,6 +359,8 @@ if [[ "$DESIRED_SIG" != "$CURRENT_SIG" ]]; then
     -e POLYMARKET_SIGNER_ADDRESS="$POLYMARKET_SIGNER_ADDRESS" \
     -e POLYMARKET_SIGNATURE_TYPE="$POLYMARKET_SIGNATURE_TYPE" \
     -e POLYMARKETDATA_API_KEY="$POLYMARKETDATA_API_KEY" \
+    -e LONGSHOT_DATA_PROVIDER="$LONGSHOT_DATA_PROVIDER" \
+    -e LONGSHOT_DATA_TIMEOUT="$LONGSHOT_DATA_TIMEOUT" \
     -e TELEGRAM_BOT_TOKEN="$TELEGRAM_BOT_TOKEN" \
     -e TELEGRAM_CHAT_ID="$TELEGRAM_CHAT_ID" \
     -e LONGSHOT_THRESHOLD="$LONGSHOT_THRESHOLD" \
@@ -398,6 +402,8 @@ SCRIPT""",
             "echo 'POLL_SECONDS=30' >> /etc/polyautomate-executor.env",
             "echo 'DRY_RUN=0' >> /etc/polyautomate-executor.env",
             "echo 'STRATEGY_RUNNER=polyautomate.runtime.longshot_executor:run_once' >> /etc/polyautomate-executor.env",
+            f"echo 'LONGSHOT_DATA_PROVIDER={longshot_data_provider}' >> /etc/polyautomate-executor.env",
+            f"echo 'LONGSHOT_DATA_TIMEOUT={longshot_data_timeout}' >> /etc/polyautomate-executor.env",
             "echo 'LONGSHOT_THRESHOLD=0.40' >> /etc/polyautomate-executor.env",
             "echo 'LONGSHOT_MIN_DAYS_LEFT=2' >> /etc/polyautomate-executor.env",
             "echo 'LONGSHOT_MAX_SPREAD=0.03' >> /etc/polyautomate-executor.env",
