@@ -345,8 +345,10 @@ CURRENT_SIG="$(cat "$STATE_DIR/deploy.sig" 2>/dev/null || true)"
 
 if [[ "$DESIRED_SIG" != "$CURRENT_SIG" ]]; then
   docker build -f "$REPO_DIR/docker/executor/Dockerfile" -t "polyautomate-executor:$NEW_SHA" "$REPO_DIR" >/dev/null
+  docker cp polyautomate-executor:/var/lib/polyautomate/longshot-state.json "$STATE_DIR/longshot-state.json" >/dev/null 2>&1 || true
   docker rm -f polyautomate-executor >/dev/null 2>&1 || true
   docker run -d --name polyautomate-executor --restart unless-stopped \
+    -v "$STATE_DIR:/var/lib/polyautomate" \
     -e EXECUTOR_MODE=live \
     -e POLL_SECONDS="$POLL_SECONDS" \
     -e STRATEGY_RUNNER="$STRATEGY_RUNNER" \
