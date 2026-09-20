@@ -14,6 +14,7 @@ import requests
 
 DEFAULT_STATE_PATH = Path("/var/lib/polyautomate/longshot-state.json")
 DATA_API_BASE_URL = "https://data-api.polymarket.com"
+SINCE_2026_TS = int(datetime(2026, 1, 1, tzinfo=timezone.utc).timestamp())
 
 
 @dataclass(frozen=True)
@@ -172,6 +173,101 @@ def _short_addr(address: str) -> str:
     return f"{address[:8]}...{address[-6:]}" if len(address) > 16 else address
 
 
+def _activity_time(row: dict[str, Any]) -> datetime:
+    return datetime.fromtimestamp(_as_int(row.get("timestamp")) or 0, tz=timezone.utc)
+
+
+def _trade_key(row: dict[str, Any]) -> tuple[str, str]:
+    return (str(row.get("conditionId") or row.get("slug") or ""), str(row.get("outcomeIndex") or row.get("outcome") or ""))
+
+
+def realized_activity_summary(activity: list[dict[str, Any]], *, since_ts: int = SINCE_2026_TS) -> dict[str, Any]:
+    """Estimate realized P&L from activity cashflows.
+
+    Polymarket's Data API gives us account activity, not a formal tax-lot ledger.
+    For this bot's current behavior, it only buys and later redeems winning shares,
+    so matching REDEEM proceeds against prior BUY cost per condition/outcome is a
+    practical realized-P&L estimate. Open buys remain excluded from realized P&L.
+    """
+    rows = [a for a in activity if isinstance(a, dict) and (_as_int(a.get("timestamp")) or 0) >= since_ts]
+    rows.sort(key=lambda a: _as_int(a.get("timestamp")) or 0)
+
+    buys: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    closed: list[dict[str, Any]] = []
+    total_bought = 0.0
+    total_redeemed = 0.0
+
+    for row in rows:
+        kind = str(row.get("type") or "").upper()
+        key = _trade_key(row)
+        if kind == "TRADE" and str(row.get("side") or "").upper() == "BUY":
+            size = _as_float(row.get("size"))
+            cost = _as_float(row.get("usdcSize") or row.get("size"))
+            total_bought += cost
+            buys.setdefault(key, []).append(
+                {
+                    "remaining_size": size,
+                    "remaining_cost": cost,
+                    "title": row.get("title"),
+                    "slug": row.get("slug"),
+                    "outcome": row.get("outcome"),
+                    "timestamp": row.get("timestamp"),
+                }
+            )
+        elif kind == "REDEEM":
+            redeem_size = _as_float(row.get("size"))
+            proceeds = _as_float(row.get("usdcSize") or row.get("size"))
+            remaining_size = redeem_size
+            matched_cost = 0.0
+            lots = buys.get(key, [])
+            for lot in lots:
+                if remaining_size <= 0:
+                    break
+                lot_size = _as_float(lot.get("remaining_size"))
+                lot_cost = _as_float(lot.get("remaining_cost"))
+                if lot_size <= 0:
+                    continue
+                used_size = min(lot_size, remaining_size)
+                used_cost = lot_cost * (used_size / lot_size)
+                matched_cost += used_cost
+                lot["remaining_size"] = lot_size - used_size
+                lot["remaining_cost"] = lot_cost - used_cost
+                remaining_size -= used_size
+
+            total_redeemed += proceeds
+            pnl = proceeds - matched_cost
+            closed.append(
+                {
+                    "timestamp": row.get("timestamp"),
+                    "title": row.get("title"),
+                    "slug": row.get("slug"),
+                    "outcome": row.get("outcome"),
+                    "size": redeem_size,
+                    "proceeds": proceeds,
+                    "cost": matched_cost,
+                    "pnl": pnl,
+                }
+            )
+
+    realized_pnl = sum(_as_float(row.get("pnl")) for row in closed)
+    wins = sum(1 for row in closed if _as_float(row.get("pnl")) > 0)
+    losses = sum(1 for row in closed if _as_float(row.get("pnl")) < 0)
+    open_cost_basis = sum(_as_float(lot.get("remaining_cost")) for lots in buys.values() for lot in lots)
+    return {
+        "since_ts": since_ts,
+        "trades_bought": sum(1 for row in rows if str(row.get("type") or "").upper() == "TRADE"),
+        "closed_count": len(closed),
+        "wins": wins,
+        "losses": losses,
+        "win_rate": wins / max(wins + losses, 1),
+        "realized_pnl": realized_pnl,
+        "total_bought": total_bought,
+        "total_redeemed": total_redeemed,
+        "open_cost_basis_from_activity": open_cost_basis,
+        "closed": closed,
+    }
+
+
 def fetch_data_api_portfolio(user: str, *, timeout: int = 20) -> dict[str, Any]:
     positions: list[dict[str, Any]] = []
     offset = 0
@@ -201,19 +297,28 @@ def fetch_data_api_portfolio(user: str, *, timeout: int = 20) -> dict[str, Any]:
     value_response.raise_for_status()
     value_payload = value_response.json()
 
-    activity_response = requests.get(
-        f"{DATA_API_BASE_URL}/activity",
-        params={"user": user, "limit": 50, "excludeDepositsWithdrawals": "false"},
-        timeout=timeout,
-    )
-    activity_response.raise_for_status()
-    activity_payload = activity_response.json()
+    activity_payload: list[dict[str, Any]] = []
+    offset = 0
+    while True:
+        activity_response = requests.get(
+            f"{DATA_API_BASE_URL}/activity",
+            params={"user": user, "limit": 500, "offset": offset, "excludeDepositsWithdrawals": "false"},
+            timeout=timeout,
+        )
+        activity_response.raise_for_status()
+        activity_batch = activity_response.json()
+        if not isinstance(activity_batch, list):
+            raise ValueError(f"unexpected activity response for {user}: {activity_batch!r}")
+        activity_payload.extend([a for a in activity_batch if isinstance(a, dict)])
+        if len(activity_batch) < 500:
+            break
+        offset += 500
 
     return {
         "user": user,
         "positions": positions,
         "value": value_payload if isinstance(value_payload, list) else [],
-        "activity": activity_payload if isinstance(activity_payload, list) else [],
+        "activity": activity_payload,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -248,8 +353,10 @@ def render_data_api_html(
     fetched_at = str(payload.get("fetched_at") or "")
     total_value = _portfolio_value(payload)
     total_initial = sum(_as_float(p.get("initialValue")) for p in positions)
-    total_pnl = sum(_as_float(p.get("cashPnl")) for p in positions)
-    realized_pnl = sum(_as_float(p.get("realizedPnl")) for p in positions)
+    unrealized_pnl = sum(_as_float(p.get("cashPnl")) for p in positions)
+    activity_summary = realized_activity_summary([a for a in payload.get("activity", []) if isinstance(a, dict)])
+    realized_pnl = _as_float(activity_summary.get("realized_pnl"))
+    total_pnl = realized_pnl + unrealized_pnl
     winners = sum(1 for p in positions if _as_float(p.get("cashPnl")) > 0)
     losers = sum(1 for p in positions if _as_float(p.get("cashPnl")) < 0)
     pnl_class = "good" if total_pnl >= 0 else "bad"
@@ -276,8 +383,19 @@ def render_data_api_html(
         for p in positions
     ) or '<tr><td colspan="8" class="empty">No current positions.</td></tr>'
 
+    closed_rows = "".join(
+        f"<tr><td><strong>{_esc(a.get('title'))}</strong><div class='sub'>{_esc(a.get('slug'))}</div></td>"
+        f"<td>{_activity_time(a).strftime('%Y-%m-%d %H:%M UTC')}</td>"
+        f"<td>{_esc(a.get('outcome'))}</td>"
+        f"<td>{_as_float(a.get('size')):.4g}</td>"
+        f"<td>{_usd(_as_float(a.get('cost')))}</td>"
+        f"<td>{_usd(_as_float(a.get('proceeds')))}</td>"
+        f"<td class='{ 'good' if _as_float(a.get('pnl')) >= 0 else 'bad' }'>{_money(_as_float(a.get('pnl')))}</td></tr>"
+        for a in activity_summary.get("closed", [])[-25:][::-1]
+    ) or '<tr><td colspan="7" class="empty">No redeemed/closed trades since 2026-01-01.</td></tr>'
+
     recent_activity = [
-        a for a in payload.get("activity", []) if isinstance(a, dict) and a.get("type") in {"DEPOSIT", "WITHDRAWAL", "TRADE"}
+        a for a in payload.get("activity", []) if isinstance(a, dict) and a.get("type") in {"DEPOSIT", "WITHDRAWAL", "TRADE", "REDEEM"}
     ][:12]
     activity_rows = "".join(
         f"<tr><td>{_esc(a.get('type'))}</td>"
@@ -341,9 +459,10 @@ def render_data_api_html(
 
   <section class="grid">
     <div class="card"><div class="label">Portfolio value</div><div class="value">{_usd(total_value)}</div><div class="sub">{len(positions)} current positions</div></div>
-    <div class="card"><div class="label">Unrealized P&L</div><div class="value {pnl_class}">{_money(total_pnl)}</div><div class="sub">Basis {_usd(total_initial)} · realized {_money(realized_pnl)}</div></div>
+    <div class="card"><div class="label">Total P&L since 2026</div><div class="value {pnl_class}">{_money(total_pnl)}</div><div class="sub">Realized {_money(realized_pnl)} · unrealized {_money(unrealized_pnl)}</div></div>
     <div class="card"><div class="label">Spendable CLOB cash</div><div class="value {'gold' if spendable_usdc is not None and spendable_usdc < 5 else ''}">{spendable_text}</div><div class="sub">{_esc(spendable_note)}</div></div>
-    <div class="card"><div class="label">Position hit rate</div><div class="value">{_pct(winners / max(winners + losers, 1))}</div><div class="sub">{winners} up · {losers} down</div></div>
+    <div class="card"><div class="label">Closed trade hit rate</div><div class="value">{_pct(_as_float(activity_summary.get('win_rate')))}</div><div class="sub">{activity_summary.get('wins')} wins · {activity_summary.get('losses')} losses · {activity_summary.get('closed_count')} closed</div></div>
+    <div class="card"><div class="label">Current hit rate</div><div class="value">{_pct(winners / max(winners + losers, 1))}</div><div class="sub">{winners} up · {losers} down · basis {_usd(total_initial)}</div></div>
   </section>
 
   <section class="card" style="margin-bottom:18px">
@@ -355,6 +474,11 @@ def render_data_api_html(
     <section class="card">
       <h2>Current Positions</h2>
       <table><thead><tr><th>Market</th><th>Side</th><th>Size</th><th>Avg</th><th>Now</th><th>Value</th><th>P&L</th><th>%</th></tr></thead><tbody>{rows}</tbody></table>
+    </section>
+    <section class="card">
+      <h2>Closed / Redeemed Since 2026</h2>
+      <div class="note">Realized P&L is estimated from Data API activity by matching BUY cost to later REDEEM proceeds for the same market/outcome. Open buys are excluded here and shown as unrealized above.</div>
+      <table><thead><tr><th>Market</th><th>Redeemed</th><th>Outcome</th><th>Size</th><th>Cost</th><th>Proceeds</th><th>P&L</th></tr></thead><tbody>{closed_rows}</tbody></table>
     </section>
     <section class="card">
       <h2>Historical Activity</h2>

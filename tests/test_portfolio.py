@@ -10,6 +10,7 @@ from polyautomate.portfolio import (
     load_state,
     render_data_api_html,
     render_html,
+    realized_activity_summary,
     summarize,
     write_report,
 )
@@ -143,3 +144,48 @@ def test_render_data_api_html_shows_live_position_metrics():
     assert "$2.09" in html
     assert "Will Trump acquire Greenland before 2027?" in html
     assert "Below typical 5-share minimum" in html
+    assert "Total P&L since 2026" in html
+
+
+def test_realized_activity_summary_matches_redeems_to_buys():
+    activity = [
+        {
+            "type": "TRADE",
+            "side": "BUY",
+            "timestamp": 1767225600,
+            "conditionId": "condition-1",
+            "outcomeIndex": 1,
+            "title": "Resolved winner",
+            "slug": "resolved-winner",
+            "outcome": "No",
+            "size": 5,
+            "usdcSize": 4.25,
+        },
+        {
+            "type": "REDEEM",
+            "timestamp": 1767312000,
+            "conditionId": "condition-1",
+            "outcomeIndex": 1,
+            "title": "Resolved winner",
+            "slug": "resolved-winner",
+            "outcome": "No",
+            "size": 5,
+            "usdcSize": 5,
+        },
+        {
+            "type": "TRADE",
+            "side": "BUY",
+            "timestamp": 1767398400,
+            "conditionId": "condition-open",
+            "outcomeIndex": 1,
+            "size": 5,
+            "usdcSize": 4.5,
+        },
+    ]
+
+    summary = realized_activity_summary(activity)
+
+    assert summary["closed_count"] == 1
+    assert summary["wins"] == 1
+    assert summary["realized_pnl"] == pytest.approx(0.75)
+    assert summary["open_cost_basis_from_activity"] == pytest.approx(4.5)
