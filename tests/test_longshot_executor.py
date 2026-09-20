@@ -644,3 +644,64 @@ class TestGammaLiveDataProvider:
 
         mock_gamma_cls.assert_called_once()
         mock_pmd_cls.assert_not_called()
+
+
+class TestLivePositionDedup:
+    def test_fetch_live_position_slugs_filters_positive_positions(self):
+        from polyautomate.runtime import longshot_executor as mod
+
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return [
+                    {"slug": "owned-market", "size": 5},
+                    {"slug": "zero-market", "size": 0},
+                    {"slug": "", "size": 3},
+                ]
+
+        with patch("polyautomate.runtime.longshot_executor.requests.get", return_value=Response()):
+            assert mod._fetch_live_position_slugs("0xabc") == {"owned-market"}
+
+    def test_fetch_live_position_slugs_returns_none_on_api_failure(self):
+        from polyautomate.runtime import longshot_executor as mod
+
+        with patch("polyautomate.runtime.longshot_executor.requests.get", side_effect=RuntimeError("boom")):
+            assert mod._fetch_live_position_slugs("0xabc") is None
+
+    def test_run_once_skips_candidate_already_owned_live(self):
+        from polyautomate.runtime import longshot_executor as mod
+
+        env = {
+            "LONGSHOT_DATA_PROVIDER": "gamma_clob",
+            "DRY_RUN": "0",
+            "POLYMARKET_API_KEY": "test-pm-key",
+            "POLYMARKET_SIGNING_KEY": "aa" * 32,
+            "POLYMARKET_PASSPHRASE": "test-passphrase",
+            "POLYMARKET_PRIVATE_KEY": "bb" * 32,
+            "POLYMARKET_ADDRESS": "0x0000000000000000000000000000000000000001",
+            "LONGSHOT_STATE_PATH": "/tmp/test-longshot-state.json",
+        }
+        candidate = mod.Candidate(
+            slug="owned-market",
+            question="Will owned happen?",
+            yes_token_id="yes-token",
+            no_token_id="no-token",
+            yes_price=0.2,
+            no_price=0.8,
+            end_date=None,
+            avg_spread=0.01,
+            rel_spread=0.01,
+        )
+
+        with patch.dict(os.environ, env, clear=False), \
+             patch.object(mod, "_fetch_usdc_balance", return_value=500), \
+             patch.object(mod, "_fetch_live_position_slugs", return_value={"owned-market"}), \
+             patch.object(mod, "_scan_candidates", return_value=[candidate]), \
+             patch.object(mod, "_place_order_signed") as mock_place_order, \
+             patch.object(mod, "_load_state", return_value={}), \
+             patch.object(mod, "_save_state"):
+            assert mod.run_once() == 0
+
+        mock_place_order.assert_not_called()

@@ -19,6 +19,7 @@ from polyautomate.clients.live_data import GammaLiveDataAdapter
 
 
 LOGGER = logging.getLogger("longshot_executor")
+DATA_API_BASE_URL = "https://data-api.polymarket.com"
 
 
 class InsufficientBalanceError(RuntimeError):
@@ -150,6 +151,61 @@ def _normalize_state(state: dict) -> dict:
     if "closed_positions" not in state:
         state["closed_positions"] = []
     return state
+
+
+def _fetch_live_position_slugs(user: str, *, timeout: float = 10.0) -> set[str] | None:
+    """Return current Polymarket position slugs for the account.
+
+    Local executor state is the primary duplicate guard, but it can be lost if
+    infrastructure changes go wrong. This live account check prevents rebuying
+    markets that the wallet already owns.
+    """
+    if not user:
+        return set()
+
+    slugs: set[str] = set()
+    offset = 0
+    while True:
+        try:
+            response = requests.get(
+                f"{DATA_API_BASE_URL}/positions",
+                params={
+                    "user": user,
+                    "limit": 500,
+                    "offset": offset,
+                    "sizeThreshold": 0,
+                    "sortBy": "CURRENT",
+                    "sortDirection": "DESC",
+                },
+                timeout=timeout,
+            )
+            response.raise_for_status()
+            batch = response.json()
+        except Exception:
+            LOGGER.exception("live_position_fetch_failed user=%s offset=%s", user, offset)
+            return None
+
+        if not isinstance(batch, list):
+            LOGGER.warning("live_position_fetch_unexpected user=%s payload=%r", user, batch)
+            return None
+
+        for position in batch:
+            if not isinstance(position, dict):
+                continue
+            slug = str(position.get("slug") or "").strip()
+            size = 0.0
+            try:
+                size = float(position.get("size") or 0)
+            except (TypeError, ValueError):
+                size = 0.0
+            if slug and size > 0:
+                slugs.add(slug)
+
+        if len(batch) < 500:
+            break
+        offset += 500
+
+    return slugs
 
 
 def _send_telegram_message(text: str) -> None:
@@ -852,8 +908,19 @@ def run_once() -> int:
                 )
                 _save_state(state_path, state)
                 return 0
-        else:
-            LOGGER.warning("balance_fetch_failed — falling back to LONGSHOT_BANKROLL_USD")
+    else:
+        LOGGER.warning("balance_fetch_failed — falling back to LONGSHOT_BANKROLL_USD")
+
+    live_position_slugs: set[str] = set()
+    if not dry_run:
+        fetched_live_position_slugs = _fetch_live_position_slugs(pm_address)
+        if fetched_live_position_slugs is None:
+            LOGGER.warning("live_position_dedup_unavailable — skipping new entries this cycle")
+            _save_state(state_path, state)
+            return 0
+        live_position_slugs = fetched_live_position_slugs
+        if live_position_slugs:
+            LOGGER.info("live_position_dedup slugs=%s", len(live_position_slugs))
 
     # Hold-to-resolution: keep positions open until market resolves/closes.
     for slug, pos in list(open_positions.items()):
@@ -888,6 +955,10 @@ def run_once() -> int:
             state["closed_positions"].append(pos)
             del open_positions[slug]
 
+    known_open_positions = dict(open_positions)
+    for slug in live_position_slugs:
+        known_open_positions.setdefault(slug, {"source": "live_position_dedup"})
+
     guardrail_error = _evaluate_guardrail(state, now)
     if guardrail_error:
         _save_state(state_path, state)
@@ -904,14 +975,14 @@ def run_once() -> int:
         max_price=max_price,
         max_spread=max_spread,
         max_rel_spread=max_rel_spread,
-        open_positions=open_positions,
+        open_positions=known_open_positions,
     )
 
     LOGGER.info(
         "longshot_candidates count=%s threshold=%.2f open_positions=%s max_spread=%.3f max_rel_spread=%.2f",
         len(candidates),
         longshot_threshold,
-        len(open_positions),
+        len(known_open_positions),
         max_spread,
         max_rel_spread,
     )
@@ -923,7 +994,8 @@ def run_once() -> int:
     for c in candidates:
         if actions >= max_actions:
             break
-        if c.slug in open_positions:
+        if c.slug in open_positions or c.slug in live_position_slugs:
+            LOGGER.info("candidate_skipped_existing_position slug=%s local=%s live=%s", c.slug, c.slug in open_positions, c.slug in live_position_slugs)
             continue
 
         # Longshot edge: buy NO when YES enters <= threshold.
