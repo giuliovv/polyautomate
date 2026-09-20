@@ -502,11 +502,11 @@ echo "portfolio_published bucket=$PORTFOLIO_BUCKET"
 SCRIPT""",
                     "chmod +x /usr/local/bin/publish-portfolio-dashboard.sh",
                     f"cat > /etc/polyautomate-portfolio.env <<'ENV'\nREGION={cdk.Aws.REGION}\nREPO_DIR=/opt/polyautomate-src\nSECRET_ARN={executor_credentials_secret.secret_arn}\nPORTFOLIO_BUCKET={portfolio_bucket.bucket_name}\nPORTFOLIO_DISTRIBUTION_DOMAIN={portfolio_distribution.distribution_domain_name}\nENV",
-                    "echo '* * * * * root bash -lc \"set -a; source /etc/polyautomate-portfolio.env; set +a; /usr/local/bin/publish-portfolio-dashboard.sh\"' > /etc/cron.d/polyautomate-portfolio",
+                    "echo '* * * * * root bash -lc \"set -a; source /etc/polyautomate-portfolio.env; set +a; /usr/local/bin/publish-portfolio-dashboard.sh >> /var/log/polyautomate-portfolio.log 2>&1; aws s3 cp /var/log/polyautomate-portfolio.log s3://$PORTFOLIO_BUCKET/publisher.log --region $REGION --content-type text/plain --cache-control no-store --only-show-errors || true\"' > /etc/cron.d/polyautomate-portfolio",
                     "chmod 644 /etc/cron.d/polyautomate-portfolio",
-                    "echo portfolio_publisher_version=3",
+                    "echo portfolio_publisher_version=5",
                     "systemctl restart crond || true",
-                    "bash -lc 'set -a; source /etc/polyautomate-portfolio.env; set +a; /usr/local/bin/publish-portfolio-dashboard.sh'",
+                    "bash -lc 'set -a; source /etc/polyautomate-portfolio.env; set +a; date -u >> /var/log/polyautomate-portfolio.log; /usr/local/bin/publish-portfolio-dashboard.sh >> /var/log/polyautomate-portfolio.log 2>&1; aws s3 cp /var/log/polyautomate-portfolio.log s3://$PORTFOLIO_BUCKET/publisher.log --region $REGION --content-type text/plain --cache-control no-store --only-show-errors'",
                 ]
             },
         )
