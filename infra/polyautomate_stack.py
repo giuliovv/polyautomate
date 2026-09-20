@@ -494,11 +494,6 @@ else
   git -C "$REPO_DIR" reset --hard "origin/$REPO_BRANCH"
   git -C "$REPO_DIR" clean -fd
 fi
-if ! PYTHONPATH="$REPO_DIR" python3 -c 'import polyautomate.portfolio' >/dev/null 2>&1; then
-  echo "portfolio_publish_skipped reason=portfolio_module_unavailable repo_dir=$REPO_DIR"
-  exit 0
-fi
-
 export POLYMARKET_API_KEY="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_API_KEY", ""))')"
 export POLYMARKET_PASSPHRASE="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_PASSPHRASE", ""))')"
 export POLYMARKET_SIGNING_KEY="$(printf '%s' "$SECRET_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("POLYMARKET_SIGNING_KEY", ""))')"
@@ -509,11 +504,24 @@ export POLYMARKET_SIGNATURE_TYPE="$(printf '%s' "$SECRET_JSON" | python3 -c 'imp
 mkdir -p "$STATE_DIR/portfolio"
 if docker inspect polyautomate-executor >/dev/null 2>&1; then
   docker cp polyautomate-executor:/var/lib/polyautomate/longshot-state.json "$STATE_DIR/longshot-state.json" >/dev/null 2>&1 || true
+  if docker exec polyautomate-executor python -m polyautomate.portfolio \
+    --user "$POLYMARKET_ADDRESS" \
+    --include-clob-balance \
+    --out /tmp/polyautomate-portfolio.html; then
+    docker cp polyautomate-executor:/tmp/polyautomate-portfolio.html "$STATE_DIR/portfolio/index.html"
+  else
+    echo "portfolio_publish_container_failed"
+    exit 0
+  fi
+elif PYTHONPATH="$REPO_DIR" python3 -c 'import polyautomate.portfolio' >/dev/null 2>&1; then
+  PYTHONPATH="$REPO_DIR" python3 -m polyautomate.portfolio \
+    --user "$POLYMARKET_ADDRESS" \
+    --include-clob-balance \
+    --out "$STATE_DIR/portfolio/index.html"
+else
+  echo "portfolio_publish_skipped reason=no_container_and_host_module_unavailable repo_dir=$REPO_DIR"
+  exit 0
 fi
-PYTHONPATH="$REPO_DIR" python3 -m polyautomate.portfolio \
-  --user "$POLYMARKET_ADDRESS" \
-  --include-clob-balance \
-  --out "$STATE_DIR/portfolio/index.html"
 aws s3 cp "$STATE_DIR/portfolio/index.html" "s3://$PORTFOLIO_BUCKET/index.html" \
   --region "$REGION" \
   --cache-control "no-store" \
@@ -525,7 +533,7 @@ SCRIPT""",
                     f"cat > /etc/polyautomate-portfolio.env <<'ENV'\nREGION={cdk.Aws.REGION}\nREPO_DIR=/opt/polyautomate-src\nREPO_URL={executor_repo_url}\nREPO_BRANCH={executor_repo_branch}\nSECRET_ARN={executor_credentials_secret.secret_arn}\nPORTFOLIO_BUCKET={portfolio_bucket.bucket_name}\nPORTFOLIO_DISTRIBUTION_DOMAIN={portfolio_distribution.distribution_domain_name}\nENV",
                     "echo '* * * * * root bash -lc \"set -a; source /etc/polyautomate-portfolio.env; set +a; /usr/local/bin/publish-portfolio-dashboard.sh >> /var/log/polyautomate-portfolio.log 2>&1; aws s3 cp /var/log/polyautomate-portfolio.log s3://$PORTFOLIO_BUCKET/publisher.log --region $REGION --content-type text/plain --cache-control no-store --only-show-errors || true\"' > /etc/cron.d/polyautomate-portfolio",
                     "chmod 644 /etc/cron.d/polyautomate-portfolio",
-                    "echo portfolio_publisher_version=6",
+                    "echo portfolio_publisher_version=7",
                     "systemctl restart crond || true",
                     "bash -lc 'set -a; source /etc/polyautomate-portfolio.env; set +a; date -u >> /var/log/polyautomate-portfolio.log; /usr/local/bin/publish-portfolio-dashboard.sh >> /var/log/polyautomate-portfolio.log 2>&1; aws s3 cp /var/log/polyautomate-portfolio.log s3://$PORTFOLIO_BUCKET/publisher.log --region $REGION --content-type text/plain --cache-control no-store --only-show-errors'",
                 ]
