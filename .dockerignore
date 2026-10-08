@@ -1,0 +1,14 @@
+.git
+**/.git
+**/.venv
+**/__pycache__
+**/.pytest_cache
+infra/cdk.out
+infra/.venv
+node_modules
+*.pyc
+*.pyo
+*.log
+history
+analysis/*.csv
+notebook.ipynb

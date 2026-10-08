@@ -61,6 +61,58 @@ cdk deploy \
   -c dailySchedule='cron(0 3 * * ? *)'
 ```
 
+
+## Lambda Executor Migration
+
+`PolyautomateLambdaStack` provisions a parallel Lambda-based executor path in
+`eu-west-1`. It imports the existing executor secret and portfolio dashboard
+bucket, so Lambda can be iterated without updating the EC2 executor stack. This
+is intended to replace the always-on EC2 executor after a parity window.
+
+Lambda resources:
+
+- `ExecutorStateBucket`: private S3 state for `executor/longshot-state.json`
+- `ExecutorLambda`: scheduled longshot executor, default `DRY_RUN=1` for shadow testing
+- `PortfolioPublisherLambda`: scheduled dashboard publisher writing `index.html` to the existing dashboard bucket
+- `LambdaExecutorSchedule`: default `rate(5 minutes)`
+- `LambdaPortfolioPublisherSchedule`: default `rate(5 minutes)`
+
+Deploy the shadow stack with the existing resource names:
+
+```bash
+cdk deploy PolyautomateLambdaStack \
+  -c executorSecretArn=<ExecutorCredentialsSecretArn> \
+  -c portfolioBucketName=<PortfolioDashboardBucketName> \
+  -c lambdaExecutorDryRun=1
+```
+
+The Lambda image uses ARM64 so it builds natively on Graviton hosts and runs
+cheaper than x86. The executor handler also uses an S3 lock object to avoid
+overlapping scheduled runs; this replaces Lambda reserved concurrency, which may
+not be available in low-concurrency accounts.
+
+The EC2 executor remains unchanged while Lambda is in dry-run. Cutover process:
+
+1. Copy the latest EC2 state file to S3:
+
+```bash
+aws ssm send-command \
+  --region eu-west-1 \
+  --instance-ids <executor-instance-id> \
+  --document-name AWS-RunShellScript \
+  --parameters commands='["aws s3 cp /var/lib/polyautomate/longshot-state.json s3://<ExecutorStateBucketName>/executor/longshot-state.json --region eu-west-1"]'
+```
+
+If the deployer cannot call `ssm:SendCommand`, copy the state file manually or
+temporarily grant that permission before running parity checks.
+
+2. Compare EC2 executor logs with `ExecutorLambda` dry-run logs for at least one day.
+3. Deploy `PolyautomateLambdaStack` with `-c lambdaExecutorDryRun=0`.
+4. Disable or terminate the EC2 executor after Lambda places no duplicate-risk orders and the dashboard remains current.
+
+Do not run EC2 and Lambda both live (`DRY_RUN=0`) for the same wallet. The live
+position dedupe is a safety net, not the primary concurrency control.
+
 ## Runtime configuration
 
 Executor container env vars:

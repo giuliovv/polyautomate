@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac as _hmac
-import json
 import logging
 import os
 import time
@@ -16,6 +15,7 @@ import requests
 
 from polyautomate.clients.polymarketdata import PMDClient, PMDError
 from polyautomate.clients.live_data import GammaLiveDataAdapter
+from polyautomate.runtime.aws_state import load_json_state, save_json_state
 
 
 LOGGER = logging.getLogger("longshot_executor")
@@ -129,18 +129,11 @@ def _parse_dt(raw: object) -> datetime | None:
 
 
 def _load_state(path: Path) -> dict:
-    if not path.exists():
-        return {"traded": {}}
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        LOGGER.exception("state_load_failed path=%s", path)
-        return {"traded": {}}
+    return load_json_state(path, {"traded": {}})
 
 
 def _save_state(path: Path, state: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+    save_json_state(path, state)
 
 
 def _normalize_state(state: dict) -> dict:
@@ -909,7 +902,7 @@ def run_once() -> int:
                 _save_state(state_path, state)
                 return 0
     else:
-        LOGGER.warning("balance_fetch_failed — falling back to LONGSHOT_BANKROLL_USD")
+        LOGGER.info("dry_run_balance_fetch_skipped using LONGSHOT_BANKROLL_USD")
 
     live_position_slugs: set[str] = set()
     if not dry_run:
