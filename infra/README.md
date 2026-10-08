@@ -74,7 +74,7 @@ Lambda resources:
 - `ExecutorStateBucket`: private S3 state for `executor/longshot-state.json`
 - `ExecutorLambda`: scheduled longshot executor, default `DRY_RUN=1` for shadow testing
 - `PortfolioPublisherLambda`: scheduled dashboard publisher writing `index.html` to the existing dashboard bucket
-- `LambdaExecutorSchedule`: default `rate(5 minutes)`
+- `LambdaExecutorSchedule`: default `rate(1 hour)`
 - `LambdaPortfolioPublisherSchedule`: default `rate(5 minutes)`
 
 Deploy the shadow stack with the existing resource names:
@@ -84,6 +84,8 @@ cdk deploy PolyautomateLambdaStack \
   -c executorSecretArn=<ExecutorCredentialsSecretArn> \
   -c portfolioBucketName=<PortfolioDashboardBucketName> \
   -c lambdaExecutorDryRun=1
+# Optional override for faster shadow testing:
+# -c lambdaExecutorSchedule='rate(5 minutes)'
 ```
 
 The Lambda image uses ARM64 so it builds natively on Graviton hosts and runs

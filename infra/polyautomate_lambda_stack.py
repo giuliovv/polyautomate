@@ -24,7 +24,7 @@ class PolyautomateLambdaStack(cdk.Stack):
 
         longshot_data_provider = self.node.try_get_context("longshotDataProvider") or "gamma_clob"
         longshot_data_timeout = str(self.node.try_get_context("longshotDataTimeout") or "10")
-        lambda_executor_schedule = self.node.try_get_context("lambdaExecutorSchedule") or "rate(5 minutes)"
+        lambda_executor_schedule = self.node.try_get_context("lambdaExecutorSchedule") or "rate(1 hour)"
         lambda_portfolio_schedule = self.node.try_get_context("lambdaPortfolioSchedule") or "rate(5 minutes)"
         lambda_executor_dry_run = str(self.node.try_get_context("lambdaExecutorDryRun") or "1")
 
