@@ -842,6 +842,7 @@ def run_once() -> int:
     pm_signer_address = os.getenv("POLYMARKET_SIGNER_ADDRESS") or pm_address
     pm_signature_type = int(os.getenv("POLYMARKET_SIGNATURE_TYPE", "1"))
     dry_run = os.getenv("DRY_RUN", "1") == "1"
+    dry_run_live_checks = dry_run and os.getenv("LONGSHOT_DRY_RUN_LIVE_CHECKS", "0") == "1"
 
     if data_provider not in {"polymarketdata", "pmd", "gamma_clob", "gamma"}:
         LOGGER.warning("unknown_longshot_data_provider provider=%s", data_provider)
@@ -880,13 +881,14 @@ def run_once() -> int:
     # In live mode, read the actual USDC balance from Polymarket and use it
     # as the bankroll for Kelly sizing.  This means sizing automatically scales
     # with the real account rather than relying on a manually-maintained env var.
-    # In dry-run mode we fall back to LONGSHOT_BANKROLL_USD (no real credentials).
+    # Dry-run can optionally use live read-only checks so shadow Lambda parity
+    # matches the EC2 executor without placing orders.
     live_bankroll_usd: float | None = None
-    if not dry_run:
+    if not dry_run or dry_run_live_checks:
         if not pm_api_key or not pm_signing_key or not pm_passphrase or not pm_address:
             LOGGER.warning("missing_trading_credentials")
             return 0
-        if not pm_private_key:
+        if not dry_run and not pm_private_key:
             LOGGER.warning("missing_trading_private_key")
             return 0
         live_bankroll_usd = _fetch_usdc_balance()
@@ -905,7 +907,7 @@ def run_once() -> int:
         LOGGER.info("dry_run_balance_fetch_skipped using LONGSHOT_BANKROLL_USD")
 
     live_position_slugs: set[str] = set()
-    if not dry_run:
+    if not dry_run or dry_run_live_checks:
         fetched_live_position_slugs = _fetch_live_position_slugs(pm_address)
         if fetched_live_position_slugs is None:
             LOGGER.warning("live_position_dedup_unavailable — skipping new entries this cycle")

@@ -75,6 +75,7 @@ class PolyautomateLambdaStack(cdk.Stack):
             "LONGSHOT_GUARDRAIL_MIN_PNL_USD": "-5",
             "LONGSHOT_GUARDRAIL_MIN_WIN_RATE": "0.35",
             "LONGSHOT_GUARDRAIL_COOLDOWN_MIN": "180",
+            "LONGSHOT_DRY_RUN_LIVE_CHECKS": "1",
         }
 
         lambda_image_code = _lambda.DockerImageCode.from_image_asset(
